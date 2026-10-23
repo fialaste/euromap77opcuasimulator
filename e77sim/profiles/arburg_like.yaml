@@ -1,0 +1,131 @@
+# Arburg-like profile: all three OPC 40077 profiles and most optional nodes.
+# Values follow common practice for a ~1000 kN electric machine, not a real machine export.
+profile: Arburg-like
+port: 4840
+
+identity:
+  manufacturer: ARBURG
+  manufacturer_uri: https://www.arburg.com
+  model: ALLROUNDER 470 A
+  serial_number: "0123456"
+  controller_name: GESTICA
+  product_code: 470A-1000-290
+  hardware_revision: "1.0"
+  software_revision: "3.6.2"
+  device_revision: "1"
+  device_manual: https://www.arburg.com
+  asset_id: IMM-01
+  component_name: Lis 01
+
+# Facets on top of the Basic Server Profile: jobs, datasets
+facets: [jobs, datasets]
+
+# Optional nodes: "all" builds every optional node except those matching `exclude`,
+# "none" builds only mandatory nodes plus those matching `include`.
+optional: all
+exclude: []
+include: []
+
+configuration:
+  user_machine_name: Lis 01
+  location_name: Hala A / linka 1
+  mes_url: ""
+  production_only_with_mes: false
+
+injection_units:
+  - barrel_id: BAR-30-0815
+    screw_id: SCR-30-4711
+    screw_diameter: 30
+    max_screw_stroke: 135
+    screw_volume: 95
+    zones:
+      - {name: Nozzle, nominal: 245}
+      - {name: Zone 1, nominal: 240}
+      - {name: Zone 2, nominal: 235}
+      - {name: Zone 3, nominal: 230}
+      - {name: Zone 4, nominal: 225}
+      - {name: Feed zone, nominal: 45, classification: COOLING}
+
+moulds:
+  - id: MLD-2026-017
+    description: Kryt konektoru, 4-násobná forma
+    zones:
+      - {name: Fixed half, nominal: 45, classification: TEMPERATURE_CONTROL}
+      - {name: Moving half, nominal: 50, classification: TEMPERATURE_CONTROL}
+      - {name: Hot runner 1, nominal: 235, classification: HOT_RUNNER}
+      - {name: Hot runner 2, nominal: 235, classification: HOT_RUNNER}
+      - {name: Hot runner 3, nominal: 235, classification: HOT_RUNNER}
+      - {name: Hot runner 4, nominal: 235, classification: HOT_RUNNER}
+
+# Electric machine: the power unit has no oil temperature
+power_units:
+  - {id: Servo drive, oil_temperature: null}
+
+users:
+  - {id: "1001", name: Jan Novák, user_level: "2", user_role: Operator, language: cs-CZ, card_uid: 04A1B2C3}
+  - {id: "1002", name: Petra Svobodová, user_level: "4", user_role: Setter, language: cs-CZ, present: false}
+
+standstill_reasons:
+  - {id: "10", text: Výměna formy}
+  - {id: "20", text: Čekání na materiál}
+  - {id: "30", text: Porucha stroje}
+  - {id: "40", text: Údržba}
+  - {id: "50", text: Přestávka}
+
+job:
+  job_name: J-2026-0417
+  job_description: Kryt konektoru, série A
+  customer_name: Elektro s.r.o.
+  production_dataset_name: KRYT_A_4x
+  production_dataset_description: PP, 4 kavity
+  material: [PP Moplen HP500N]
+  product_name: [Kryt konektoru A]
+  product_description: [Kryt konektoru A, černý]
+  mould_id: MLD-2026-017
+  nominal_parts: 20000
+  nominal_box_parts: 400
+  expected_cycle_time: 20000
+  num_cavities: 4
+  continue_at_job_end: false
+  lot_name: LOT-2026-10-23-A
+
+cycle:
+  jitter: 0.03          # relative random spread of the cycle time
+  scrap_rate: 0.01      # extra random scrap on top of the tolerance check
+  # Per injection unit. Mandatory parameters are always sent, optional ones only when listed here.
+  # nominal/sigma in the node's unit (ms for times); tol is the allowed deviation for a good part.
+  parameters:
+    CushionVolume: {nominal: 4.5, sigma: 0.25, tol: 1.5}
+    PlastificationVolume: {nominal: 32.0, sigma: 0.3, tol: 2.0}
+    SpecificPressureMaximum: {nominal: 1150, sigma: 15, tol: 80}
+    InjectionTime: {nominal: 850, sigma: 12, tol: 80}
+    DosingTime: {nominal: 4200, sigma: 60, tol: 600}
+    CushionStroke: {nominal: 6.4, sigma: 0.3}
+    DecompressionVolumeBeforePlastification: {nominal: 1.0, sigma: 0.02}
+    DecompressionVolumeAfterPlastification: {nominal: 2.0, sigma: 0.02}
+    PlastificationRotationalSpeedMaximum: {nominal: 210, sigma: 2}
+    PlastificationRotationalSpeedAverage: {nominal: 195, sigma: 2}
+    PlastificationCircumferentialSpeedMaximum: {nominal: 330, sigma: 3}
+    PlastificationCircumferentialSpeedAverage: {nominal: 306, sigma: 3}
+    InjectionSpeedMaximum: {nominal: 120, sigma: 1.5}
+    InjectionSpeedAverage: {nominal: 95, sigma: 1.5}
+    TransferVolume: {nominal: 9.5, sigma: 0.15}
+    TransferStroke: {nominal: 13.4, sigma: 0.2}
+    HoldSpecificPressureMaximum: {nominal: 650, sigma: 8}
+    HoldSpecificPressureAverage: {nominal: 620, sigma: 8}
+    CavityPressureMaximum: {nominal: 420, sigma: 10}
+    PlastificationSpecificPressureMaximum: {nominal: 110, sigma: 3}
+    PlastificationSpecificPressureAverage: {nominal: 95, sigma: 3}
+    TransferSpecificPressure: {nominal: 1080, sigma: 15}
+    TransferCavityPressure: {nominal: 390, sigma: 10}
+    BackPressure: {nominal: 90, sigma: 3}
+    FlowIndex: {nominal: 1.0, sigma: 0.02}
+    InjectionStartPosition: {nominal: 45.0, sigma: 0.05}
+    VPChangeOverPosition: {nominal: 13.5, sigma: 0.15}
+
+# Default generators. `path` is a glob over the node path below the machine root.
+# Kinds: constant, uniform, gauss, walk, follow, sine (analog); weighted, markov, sequence (state)
+generators:
+  - path: "*/TemperatureZones/*/ActualTemperature"
+    kind: follow
+    params: {target: NominalTemperature, tau: 60, sigma: 0.3}

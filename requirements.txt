@@ -1,0 +1,3 @@
+asyncua==2.1.0
+aiohttp>=3.9
+PyYAML>=6

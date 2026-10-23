@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Euromap 77 Simulator</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%232563eb'/%3E%3Ctext x='8' y='12' font-size='9' text-anchor='middle' fill='white' font-family='sans-serif'%3E77%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <div class="brand">Euromap 77 <span>Simulator</span></div>
+  <nav id="tabs"></nav>
+</header>
+
+<section id="overview" class="overview"></section>
+
+<main>
+  <aside class="tree-pane">
+    <div class="tree-tools">
+      <input id="search" type="search" placeholder="Hledat uzel…">
+      <label class="chk"><input id="onlyAS" type="checkbox"> jen A/S</label>
+    </div>
+    <div id="tree" class="tree"></div>
+    <div class="legend">
+      <span class="badge A">A</span>analog <span class="badge S">S</span>stav <span class="badge C">C</span>čítač
+      <span class="badge I">I</span>identita <span class="badge K">K</span>konfigurace <span class="badge M">M</span>metoda
+    </div>
+  </aside>
+
+  <section class="editor-pane">
+    <div id="editor" class="card"><p class="muted">Vyberte uzel ve stromu vlevo.</p></div>
+  </section>
+
+  <section class="side-pane">
+    <div class="side-tabs" id="sideTabs">
+      <button data-tab="events" class="active">Události</button>
+      <button data-tab="cycle">Cyklus</button>
+      <button data-tab="jobs">Zakázky</button>
+      <button data-tab="datasets">Datové sady</button>
+      <button data-tab="messages">Hlášení</button>
+    </div>
+    <div id="side" class="side"></div>
+  </section>
+</main>
+
+<div id="toast" class="toast"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
