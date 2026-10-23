@@ -1,0 +1,89 @@
+# Zhafir-like profile: Basic Server Profile and Jobs facet, mandatory nodes only
+# (plus the optional nodes a hydraulic machine typically has). Lets a client be tested
+# against the minimal end of the spectrum.
+profile: Zhafir-like
+port: 4841
+
+identity:
+  manufacturer: ZHAFIR
+  model: ZE 1200
+  serial_number: "ZE1200-2026-0042"
+  controller_name: KEBA KePlast i1000
+
+facets: [jobs]
+
+optional: none
+include:
+  - "*/PowerUnits/*/ActualTemperature"
+  - "*/InjectionUnits/*/ScrewDiameter"
+  - "*/Jobs/ActiveJob/ExpectedCycleTime"
+  - "*/Jobs/ActiveJob/NumCavities"
+exclude: []
+
+configuration:
+  user_machine_name: Lis 02
+  location_name: Hala A / linka 2
+  production_only_with_mes: false
+
+injection_units:
+  - barrel_id: B40-0042
+    screw_diameter: 40
+    zones:
+      - {name: Nozzle, nominal: 240}
+      - {name: Zone 1, nominal: 235}
+      - {name: Zone 2, nominal: 230}
+      - {name: Zone 3, nominal: 225}
+      - {name: Zone 4, nominal: 220}
+      - {name: Zone 5, nominal: 215}
+
+moulds:
+  - id: F-0815
+    description: Víčko 2-násobná forma
+    zones:
+      - {name: Mould zone 1, nominal: 40}
+      - {name: Mould zone 2, nominal: 40}
+
+# Hydraulic machine: oil temperature of the power unit
+power_units:
+  - {id: Hydraulic unit, oil_temperature: 45}
+
+users:
+  - {id: "07", name: Operator}
+
+standstill_reasons:
+  - {id: "1", text: Výměna formy}
+  - {id: "2", text: Bez materiálu}
+  - {id: "3", text: Porucha}
+
+job:
+  job_name: Z-0815-01
+  job_description: Víčko 2K
+  customer_name: Obaly a.s.
+  production_dataset_name: VICKO_2x
+  production_dataset_description: HDPE, 2 kavity
+  material: [HDPE]
+  product_name: [Víčko 38 mm]
+  product_description: [Víčko 38 mm, bílé]
+  nominal_parts: 10000
+  expected_cycle_time: 26000
+  num_cavities: 2
+  continue_at_job_end: false
+  lot_name: LOT-Z-0042
+
+cycle:
+  jitter: 0.04
+  scrap_rate: 0.02
+  parameters:
+    CushionVolume: {nominal: 6.0, sigma: 0.35, tol: 2.0}
+    PlastificationVolume: {nominal: 60.0, sigma: 0.6, tol: 4.0}
+    SpecificPressureMaximum: {nominal: 1250, sigma: 20, tol: 100}
+    InjectionTime: {nominal: 1100, sigma: 20, tol: 120}
+    DosingTime: {nominal: 6000, sigma: 90, tol: 900}
+
+generators:
+  - path: "*/TemperatureZones/*/ActualTemperature"
+    kind: follow
+    params: {target: NominalTemperature, tau: 90, sigma: 0.5}
+  - path: "*/PowerUnits/*/ActualTemperature"
+    kind: walk
+    params: {step: 0.1, min: 42, max: 48}
