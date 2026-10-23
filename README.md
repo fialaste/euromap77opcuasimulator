@@ -6,7 +6,7 @@ Návrh a datový model jsou v [docs/plan.md](docs/plan.md) a [docs/datovy_model.
 
 ## Spuštění
 
-Hotový soubor `e77sim.exe` (Windows) nebo `e77sim` (Linux) stáhnete z artefaktů GitHub Actions (workflow *Test and build*). Stačí ho spustit, nic se neinstaluje:
+Hotový soubor pro Windows (`e77sim-<verze>-windows-x64.exe`) nebo Linux (`e77sim-<verze>-linux-x64`) stáhnete z [Releases](https://github.com/fialaste/euromap77opcuasimulator/releases). Stačí ho spustit, nic se neinstaluje:
 
 ```
 e77sim.exe
@@ -70,7 +70,7 @@ python -m pytest            # testy: asyncua klient proti běžícímu simuláto
 pyinstaller packaging/e77sim.spec   # jeden spustitelný soubor do dist/
 ```
 
-Windows `.exe` vzniká v GitHub Actions na `windows-latest`. PyInstaller neumí křížový překlad, takže lokálně se staví vždy pro aktuální systém.
+Windows `.exe` vzniká v GitHub Actions na `windows-latest`. Release vznikne pushem tagu `v*` nebo ručním spuštěním workflow *Test and build* s vyplněným `release_tag`. PyInstaller neumí křížový překlad, takže lokálně se staví vždy pro aktuální systém.
 
 ## Omezení
 
