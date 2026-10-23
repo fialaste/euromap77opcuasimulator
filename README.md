@@ -1,15 +1,16 @@
 # Euromap 77 OPC UA simulátor
 
-Simulátor vstřikovacích lisů s rozhraním **Euromap 77 / OPC 40077 v1.01** (IMM2MES) nad OPC 40083 a OPC UA DI. Slouží k vývoji a testování OPC UA klientů bez fyzických strojů. Jeden spustitelný soubor spustí až tři stroje, každý na vlastním OPC UA portu, a k nim lokální webové UI. V konzoli běží log a jednoduché příkazy.
+Simulátor vstřikovacích lisů s rozhraním **Euromap 77 / OPC 40077 v1.01** (IMM2MES) nad OPC 40083 a OPC UA DI. Slouží k vývoji a testování OPC UA klientů bez fyzických strojů. Jeden proces spustí až tři stroje, každý na vlastním OPC UA portu, a k nim lokální webové UI. V konzoli běží log a jednoduché příkazy.
 
 Návrh a datový model jsou v [docs/plan.md](docs/plan.md) a [docs/datovy_model.md](docs/datovy_model.md).
 
 ## Spuštění
 
-Hotový soubor `e77sim.exe` (Windows) nebo `e77sim` (Linux) stáhnete z artefaktů GitHub Actions (workflow *Test and build*). Stačí ho spustit, nic se neinstaluje:
+Potřebuje Python 3.11 nebo novější. Na Windows použijte `py`:
 
 ```
-e77sim.exe
+py -m pip install -r requirements.txt
+py -m e77sim
 ```
 
 Bez parametrů se spustí dva stroje a otevře se prohlížeč s UI:
@@ -24,7 +25,7 @@ Web UI běží na `http://127.0.0.1:8080/`. Konzole přijímá příkazy `s` (st
 Vlastní sestava strojů, nejvýše tři:
 
 ```
-e77sim.exe -m arburg_like:4840 -m zhafir_like:4841 -m muj_stroj.yaml:4842
+py -m e77sim -m arburg_like:4840 -m zhafir_like:4841 -m muj_stroj.yaml:4842
 ```
 
 | Parametr | Význam |
@@ -37,7 +38,7 @@ e77sim.exe -m arburg_like:4840 -m zhafir_like:4841 -m muj_stroj.yaml:4842
 | `--no-security` | jen endpoint bez zabezpečení |
 | `--no-anonymous` | zakázat anonymní přihlášení |
 | `--password`, `--password-read-only` | hesla uživatelů `OPC40077` a `OPC40077_read_only`; prázdné heslo přijme cokoli |
-| `--data-dir` | složka pro certifikáty, výchozí `e77sim-data` vedle programu |
+| `--data-dir` | složka pro certifikáty, výchozí `e77sim-data` v aktuální složce |
 
 ## Co simulátor dělá
 
@@ -67,10 +68,7 @@ Profil je YAML s identitou stroje, zapnutými facety, výběrem volitelných uzl
 pip install -r requirements.txt pytest pytest-asyncio
 python -m e77sim            # spuštění ze zdrojů
 python -m pytest            # testy: asyncua klient proti běžícímu simulátoru
-pyinstaller packaging/e77sim.spec   # jeden spustitelný soubor do dist/
 ```
-
-Windows `.exe` vzniká v GitHub Actions na `windows-latest`. PyInstaller neumí křížový překlad, takže lokálně se staví vždy pro aktuální systém.
 
 ## Omezení
 

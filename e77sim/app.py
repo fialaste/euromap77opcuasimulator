@@ -46,7 +46,7 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--no-anonymous", action="store_true", help="zakázat anonymní přihlášení")
     p.add_argument("--password", default="", help="heslo uživatele OPC40077 (prázdné = libovolné)")
     p.add_argument("--password-read-only", default="", help="heslo uživatele OPC40077_read_only (prázdné = libovolné)")
-    p.add_argument("--data-dir", help="složka pro certifikáty (výchozí e77sim-data vedle programu)")
+    p.add_argument("--data-dir", help="složka pro certifikáty (výchozí ./e77sim-data)")
     p.add_argument("-v", "--verbose", action="store_true", help="podrobný log včetně asyncua")
     p.add_argument("--version", action="version", version=f"e77sim {__version__}")
     return p.parse_args(argv)
@@ -201,10 +201,8 @@ def main(argv=None) -> None:
         code = asyncio.run(run(args))
     except KeyboardInterrupt:
         code = 0
-    except Exception as e:  # keep the console window readable when started by double click
+    except Exception as e:
         log.exception("Simulátor skončil chybou: %s", e)
-        if getattr(sys, "frozen", False) and os.name == "nt":
-            input("Stiskněte Enter pro zavření…")
         code = 1
     sys.exit(code)
 

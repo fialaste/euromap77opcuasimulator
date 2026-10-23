@@ -1,15 +1,11 @@
-"""Paths to bundled files, also inside a PyInstaller one-file executable."""
+"""Paths to bundled files."""
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 
 def package_dir() -> Path:
-    frozen = getattr(sys, "_MEIPASS", None)
-    if frozen:
-        return Path(frozen) / "e77sim"
     return Path(__file__).resolve().parent
 
 
@@ -26,7 +22,5 @@ def static_dir() -> Path:
 
 
 def data_dir() -> Path:
-    """Writable folder next to the executable (or the current folder when run from source)."""
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).resolve().parent / "e77sim-data"
+    """Writable folder for certificates, in the current folder."""
     return Path.cwd() / "e77sim-data"
