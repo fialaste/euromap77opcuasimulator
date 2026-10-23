@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "e77sim"
-version = "1.0.0"
+version = "1.0.1"
 description = "Euromap 77 (OPC 40077) OPC UA simulator of injection moulding machines"
 requires-python = ">=3.11"
 dependencies = ["asyncua>=1.1", "aiohttp>=3.9", "PyYAML>=6"]

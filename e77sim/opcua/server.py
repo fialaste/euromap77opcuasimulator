@@ -7,7 +7,10 @@ import socket
 from pathlib import Path
 
 from asyncua import Server, ua
-from asyncua.crypto.cert_gen import setup_self_signed_certificate
+from asyncua.crypto.cert_gen import dump_private_key_as_pem, generate_private_key, generate_self_signed_app_certificate
+from asyncua.crypto.uacrypto import check_certificate, load_certificate, load_private_key
+from cryptography import x509
+from cryptography.hazmat.primitives.serialization import Encoding
 from asyncua.crypto.permission_rules import PermissionRuleset, User, UserRole
 from asyncua.server.user_managers import UserManager
 from cryptography.x509.oid import ExtendedKeyUsageOID
@@ -82,19 +85,37 @@ class E77Ruleset(PermissionRuleset):
         return True
 
 
+# X.509 limits CommonName to 64 characters (RFC 5280 ub-common-name)
+CN_MAX = 64
+
+
 async def ensure_certificate(pki: Path, app_uri: str, name: str) -> tuple[Path, Path]:
+    """Self-signed certificate, regenerated when missing or when the URI or host name changed.
+
+    asyncua's setup_self_signed_certificate puts the application URI into the CommonName,
+    which fails for long host names, so the CN carries the machine name instead.
+    The application URI stays in subjectAltName as OPC 10000-6 6.2.2 requires.
+    """
     pki.mkdir(parents=True, exist_ok=True)
-    key, cert = pki / f"{name}.pem", pki / f"{name}.der"
+    key_file, cert_file = pki / f"{name}.pem", pki / f"{name}.der"
     host = socket.gethostname()
-    await setup_self_signed_certificate(
+    if key_file.is_file():
+        key = await load_private_key(key_file)
+        if cert_file.is_file() and not check_certificate(await load_certificate(cert_file), app_uri, host):
+            return key_file, cert_file
+    else:
+        key = generate_private_key()
+        key_file.write_bytes(dump_private_key_as_pem(key))
+    cert = generate_self_signed_app_certificate(
         key,
-        cert,
-        app_uri,
-        host,
-        [ExtendedKeyUsageOID.SERVER_AUTH, ExtendedKeyUsageOID.CLIENT_AUTH],
-        {"countryName": "CZ", "organizationName": "Euromap 77 Simulator", "commonName": name},
+        name[:CN_MAX],
+        {"countryName": "CZ", "organizationName": "Euromap 77 Simulator"},
+        [x509.UniformResourceIdentifier(app_uri), x509.DNSName(host)],
+        extended=[ExtendedKeyUsageOID.SERVER_AUTH, ExtendedKeyUsageOID.CLIENT_AUTH],
+        days=365,
     )
-    return key, cert
+    cert_file.write_bytes(cert.public_bytes(encoding=Encoding.DER))
+    return key_file, cert_file
 
 
 async def create_server(
