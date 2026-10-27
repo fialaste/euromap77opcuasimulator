@@ -11,6 +11,10 @@
 <header>
   <div class="brand">Euromap 77 <span>Simulator</span></div>
   <nav id="tabs"></nav>
+  <div class="fleet">
+    <button id="addMachine" class="primary">+ Přidat stroj</button>
+    <button id="resetMachines" title="Smaže uložené stroje a spustí výchozí">Obnovit výchozí stroje</button>
+  </div>
 </header>
 
 <section id="overview" class="overview"></section>
@@ -43,6 +47,30 @@
     <div id="side" class="side"></div>
   </section>
 </main>
+
+<div id="empty" class="empty" hidden>
+  <h2>Neběží žádný stroj</h2>
+  <p class="muted">Přidejte stroj tlačítkem nahoře, nebo obnovte výchozí stroje.</p>
+</div>
+
+<div id="wizard" class="modal" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="wzTitle">
+    <div class="wz-head">
+      <h2 id="wzTitle">Přidat stroj</h2>
+      <ol class="steps" id="wzSteps">
+        <li data-i="0"><b>1</b> Typ stroje</li>
+        <li data-i="1"><b>2</b> Datový model</li>
+        <li data-i="2"><b>3</b> Shrnutí</li>
+      </ol>
+      <button class="small" id="wzClose" aria-label="Zavřít">✕</button>
+    </div>
+    <div class="wz-body" id="wzBody"></div>
+    <div class="wz-foot">
+      <button id="wzBack">Zpět</button>
+      <button class="primary" id="wzNext">Další</button>
+    </div>
+  </div>
+</div>
 
 <div id="toast" class="toast"></div>
 <script src="/static/app.js"></script>

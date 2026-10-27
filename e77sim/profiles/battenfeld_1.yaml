@@ -1,0 +1,38 @@
+# Pilotní stroj 1. Typ a řízení podle seznamu strojů; čísla jednotek a zón odvozená z typového
+# označení, neověřená. Euromap 77/83 je u stroje nabízené dovybavení.
+extends: generic
+title: Battenfeld EcoPower 110/350
+description: Stroj 1 · Unilog B8 · elektrický
+drive: elektrický
+
+identity:
+  manufacturer: WITTMANN BATTENFELD
+  manufacturer_uri: https://www.wittmann-group.com
+  device_manual: https://www.wittmann-group.com
+  model: EcoPower 110/350
+  serial_number: "PILOT-01"
+  controller_name: UNILOG B8
+  product_code: EcoPower 110/350
+  asset_id: "1"
+  component_name: Lis 1
+
+configuration:
+  user_machine_name: Lis 1
+
+# Do potvrzení rozsahu dovybavení: Basic + Jobs
+facets: [jobs]
+options: [identity, screw, zones, cycle, users, mes, sleep, page, jobs_ext]
+
+injection_units:
+  - barrel_id: BAR-350-01
+    screw_id: SCR-30-01
+    screw_diameter: 30
+    max_screw_stroke: 120
+    screw_volume: 85
+    zones:
+      - {name: Nozzle, nominal: 240}
+      - {name: Zone 1, nominal: 235}
+      - {name: Zone 2, nominal: 230}
+      - {name: Zone 3, nominal: 225}
+      - {name: Zone 4, nominal: 215}
+      - {name: Feed zone, nominal: 40, classification: COOLING}

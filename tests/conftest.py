@@ -27,14 +27,14 @@ async def start_machine(profile_name: str, tmp_path, cycle_ms: int = 600, **kwar
 
 @pytest_asyncio.fixture
 async def arburg(tmp_path):
-    m = await start_machine("arburg_like", tmp_path)
+    m = await start_machine("generic", tmp_path)
     yield m
     await m.stop()
 
 
 @pytest_asyncio.fixture
 async def zhafir(tmp_path):
-    m = await start_machine("zhafir_like", tmp_path)
+    m = await start_machine("zhafir_22", tmp_path)
     yield m
     await m.stop()
 
