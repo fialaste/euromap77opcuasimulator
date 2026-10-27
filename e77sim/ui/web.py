@@ -12,9 +12,11 @@ from typing import Any
 from aiohttp import web
 from asyncua import ua
 
+from .. import catalog
+from ..config import CATALOG, MAX_MACHINES, load_profile
+from ..fleet import Fleet, FleetError, profile_yaml
 from ..opcua.builder import Builder
 from ..resources import static_dir
-from ..sim import generators as gens
 from ..sim.machine import EO_OPERATOR, Machine
 
 log = logging.getLogger("e77sim")
@@ -108,12 +110,16 @@ def build_struct(cls, data: dict) -> Any:
 
 
 class WebUI:
-    def __init__(self, machines: list[Machine], host: str, port: int):
-        self.machines = machines
+    def __init__(self, fleet: Fleet, host: str, port: int):
+        self.fleet = fleet
         self.host = host
         self.port = port
         self.runner: web.AppRunner | None = None
         self._method_info: dict[tuple[int, str], list[dict]] = {}
+
+    @property
+    def machines(self) -> list[Machine]:
+        return self.fleet.machines
 
     def url(self) -> str:
         host = "localhost" if self.host in ("0.0.0.0", "") else self.host
@@ -124,6 +130,11 @@ class WebUI:
         app.add_routes([
             web.get("/", self.index),
             web.get("/ui/machines", self.machines_overview),
+            web.get("/ui/catalog", self.catalog),
+            web.post("/ui/fleet/add", self.fleet_add),
+            web.post("/ui/fleet/remove", self.fleet_remove),
+            web.post("/ui/fleet/reset", self.fleet_reset),
+            web.get("/ui/m/{i}/export", self.export),
             web.get("/ui/m/{i}/tree", self.tree),
             web.get("/ui/m/{i}/state", self.state),
             web.get("/ui/m/{i}/method", self.method_info),
@@ -155,7 +166,7 @@ class WebUI:
         av = "Jobs/ActiveJobValues/"
         return {
             "name": m.name,
-            "profile": m.profile.get("profile", ""),
+            "profile": m.profile.get("title", ""),
             "model": f"{m.profile['identity'].get('manufacturer')} {m.profile['identity'].get('model')}",
             "endpoint": m.endpoint,
             "running": m.running,
@@ -183,6 +194,56 @@ class WebUI:
     async def machines_overview(self, request):
         return web.json_response([self.overview(m) for m in self.machines])
 
+    # ------------------------------------------------------------- machines
+    async def catalog(self, request):
+        entries = []
+        for name in CATALOG:
+            prof = load_profile(name)
+            entries.append({"id": name, "title": prof.get("title", name), "description": prof.get("description", ""),
+                            "form": catalog.form_of(prof)})
+        return web.json_response({
+            "entries": entries,
+            "groups": [{k: g.get(k) for k in ("id", "title", "text", "needs")} for g in catalog.GROUPS],
+            "drives": list(catalog.DRIVES),
+            "max": MAX_MACHINES,
+            "count": len(self.machines),
+            "persist": self.fleet.persist,
+            "save_path": str(self.fleet.save_path),
+            "next_port": self.fleet.free_port(),
+        })
+
+    async def fleet_add(self, request):
+        body = await request.json()
+        try:
+            prof = catalog.compose(load_profile(str(body.get("preset") or "generic")), body.get("form") or {})
+            prof["title"] = str(body.get("title") or prof.get("title") or "")
+            port = body.get("port")
+            m = await self.fleet.add(prof, int(port) if port not in (None, "") else None)
+        except (FleetError, ValueError, FileNotFoundError, KeyError) as e:
+            return web.json_response({"error": str(e)}, status=400)
+        return web.json_response({"ok": True, "index": self.machines.index(m), "name": m.name})
+
+    async def fleet_remove(self, request):
+        body = await request.json()
+        try:
+            await self.fleet.remove(int(body["index"]))
+        except (FleetError, ValueError, KeyError) as e:
+            return web.json_response({"error": str(e)}, status=400)
+        self._method_info.clear()
+        return web.json_response({"ok": True})
+
+    async def fleet_reset(self, request):
+        try:
+            await self.fleet.reset()
+        except FleetError as e:
+            return web.json_response({"error": str(e)}, status=400)
+        self._method_info.clear()
+        return web.json_response({"ok": True})
+
+    async def export(self, request):
+        m = self.m(request)
+        return web.Response(text=profile_yaml(m.profile), content_type="text/yaml", charset="utf-8")
+
     async def tree(self, request):
         m = self.m(request)
         nodes = []
@@ -206,9 +267,6 @@ class WebUI:
             })
         return web.json_response({
             "nodes": nodes,
-            "analog_kinds": gens.ANALOG_KINDS,
-            "state_kinds": gens.STATE_KINDS,
-            "common": gens.COMMON,
             "cycle_params": list(m.cycle_cfg),
             "requests": sorted(k for k in m.events.types if k.startswith("Request")),
             "users": [f"MachineStatus/Users/User_{i + 1}" for i, _ in enumerate(m.profile.get("users") or [])],
@@ -286,13 +344,13 @@ class WebUI:
         m = self.m(request)
         body = await request.json()
         try:
-            params = body.get("params") or {}
-            if isinstance(params, str):
-                params = json.loads(params) if params.strip() else {}
-            seed = body.get("seed")
-            m.set_generator(body["path"], body.get("kind"), params, bool(body.get("enabled", True)),
-                            int(seed) if seed not in (None, "") else None)
-        except (ValueError, KeyError, json.JSONDecodeError) as e:
+            params = None
+            if body.get("generate", True):
+                params = {k: body.get(k) for k in ("nominal", "deviation", "tau")}
+                for k in ("deviation", "tau"):
+                    params[k] = float(params[k]) if params[k] not in (None, "") else (0.0 if k == "deviation" else 10.0)
+            m.set_generator(body["path"], params, bool(body.get("enabled", True)))
+        except (ValueError, KeyError, TypeError) as e:
             return web.json_response({"error": str(e)}, status=400)
         return web.json_response({"ok": True})
 

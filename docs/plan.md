@@ -73,7 +73,7 @@ Technologie:
 ```
 e77sim/
   nodesets/            # DI 1.04, GeneralTypes 1.02 (opravený), IMM2MES 1.01
-  profiles/            # arburg_like.yaml, zhafir_like.yaml
+  profiles/            # generic.yaml + předvolby pilotních strojů (extends: generic)
   e77sim/
     __main__.py        # CLI: e77sim run profiles/*.yaml --ui-port 8080
     config/  model/  opcua/  sim/  ui/

@@ -40,15 +40,14 @@ function fmt(v, node) {
 const unit = n => (n && n.unit ? " " + n.unit : "");
 
 // ---------------------------------------------------------------- machines
-async function loadMachines() {
-  S.machines = await api("/ui/machines");
-  renderTabs();
-}
 function statusDot(o) {
   if (!o.running) return "bad";
   return o.producing ? "ok" : "warn";
 }
 function renderTabs() {
+  const full = S.machines.length >= (S.max || 3);
+  $("#addMachine").disabled = full;
+  $("#addMachine").title = full ? "Běží nejvíc strojů, kolik simulátor pojme. Nejdřív některý odeberte." : "";
   $("#tabs").innerHTML = S.machines.map((o, i) =>
     `<button class="${i === S.cur ? "active" : ""}" data-i="${i}"><span class="dot ${statusDot(o)}"></span>${esc(o.name)}</button>`).join("");
 }
@@ -58,6 +57,29 @@ $("#tabs").addEventListener("click", e => {
   $("#editor").innerHTML = '<p class="muted">Vyberte uzel ve stromu vlevo.</p>';
   renderTabs(); loadTree();
 });
+
+async function reloadMachines(cur) {
+  S.machines = await api("/ui/machines");
+  S.cur = Math.min(cur ?? S.cur, Math.max(0, S.machines.length - 1));
+  S.sel = null; S.tree = null; S.state = null; S.open = new Set(); S.sideDirty = true;
+  $("#editor").innerHTML = '<p class="muted">Vyberte uzel ve stromu vlevo.</p>';
+  renderTabs();
+  const none = !S.machines.length;
+  $("#empty").hidden = !none; $("main").hidden = none; $("#overview").hidden = none;
+  if (!none) await loadTree();
+}
+// A destructive button asks once more on its own label instead of a dialog
+S.armed = {};
+const armed = id => (S.armed[id] || 0) > Date.now();
+function confirmClick(btn, label, fn) {
+  if (armed(btn.id)) { S.armed[btn.id] = 0; return fn(); }
+  const text = btn.textContent;
+  S.armed[btn.id] = Date.now() + 3000;
+  btn.textContent = label; btn.classList.add("confirm");
+  setTimeout(() => { if (!armed(btn.id)) { btn.textContent = text; btn.classList.remove("confirm"); } }, 3100);
+}
+$("#resetMachines").addEventListener("click", e => confirmClick(e.target, "Opravdu obnovit?", () =>
+  act(() => api("/ui/fleet/reset", {}), "Výchozí stroje obnoveny").then(() => reloadMachines(0))));
 
 async function loadTree() {
   S.tree = await api(M("tree"));
@@ -90,10 +112,14 @@ function renderOverview() {
       <button data-a="toggle_cycle">${o.cycle_enabled ? "Zastavit cyklus" : "Spustit cyklus"}</button>
       <button data-a="randomize">Vše náhodně</button>
       <button data-a="freeze">Zmrazit vše</button>
+      <a class="button" href="${M("export")}" download="${esc(o.name)}.yaml">Uložit jako YAML</a>
+      ${armed("removeMachine") ? '<button id="removeMachine" class="danger confirm">Opravdu odebrat?</button>' : '<button id="removeMachine" class="danger">Odebrat stroj</button>'}
     </div>`,
   ].join("");
 }
 $("#overview").addEventListener("click", e => {
+  if (e.target.id === "removeMachine") return confirmClick(e.target, "Opravdu odebrat?", () =>
+    act(() => api("/ui/fleet/remove", { index: S.cur }), "Stroj odebrán").then(() => reloadMachines(Math.max(0, S.cur - 1))));
   const b = e.target.closest("button[data-a]"); if (!b) return;
   act(() => api(M("action"), { action: b.dataset.a }));
 });
@@ -165,20 +191,38 @@ function inputFor(n, v) {
   const numeric = ["Double", "Float", "Duration", "UInt16", "UInt32", "UInt64", "Int16", "Int32", "Int64", "Byte"].includes(n.type);
   return `<input id="val" ${numeric ? 'type="number" step="any"' : ""} value="${esc(v ?? "")}" style="min-width:220px">${esc(unit(n))}`;
 }
+function genDefaults(n) {
+  const v = S.state.values[n.path];
+  if (n.cls === "S") return { nominal: v, deviation: 0.02, tau: 30, enabled: true };
+  const sib = n.path.replace(/[^/]+$/, "NominalTemperature");
+  const lo = n.range ? n.range[0] : 0, hi = n.range ? n.range[1] : 100;
+  return { nominal: S.byPath[sib] ? "NominalTemperature" : (v ?? (lo + hi) / 2), deviation: +((hi - lo) / 500).toPrecision(2), tau: 10, enabled: true };
+}
 function genEditor(n) {
-  const kinds = n.cls === "A" ? S.tree.analog_kinds : S.tree.state_kinds;
   const g = S.state.generators[n.path];
-  const kind = g ? g.kind : "";
-  const params = g ? g.params : {};
-  return `<h3>Generátor</h3>
-    <div class="row">
-      <select id="gkind"><option value="">— žádný —</option>${Object.keys(kinds).map(k => `<option ${k === kind ? "selected" : ""}>${k}</option>`).join("")}</select>
-      <label class="chk"><input type="checkbox" id="genabled" ${!g || g.enabled ? "checked" : ""}> zapnutý</label>
-      <input id="gseed" placeholder="seed" style="width:80px" value="${esc(g?.seed ?? "")}">
-      <button class="primary" id="gsave">Uložit generátor</button>
+  const x = g || genDefaults(n);
+  const st = n.cls === "S";
+  let nominal;
+  if (st) {
+    const opts = n.enum ? Object.entries(n.enum) : [["true", "true"], ["false", "false"]];
+    nominal = `<select id="gnom">${opts.map(([k, t]) => `<option value="${k}" ${String(x.nominal) === k ? "selected" : ""}>${n.enum ? k + " – " : ""}${esc(t)}</option>`).join("")}</select>`;
+  } else {
+    nominal = `<input id="gnom" value="${esc(x.nominal ?? "")}" placeholder="aktuální hodnota">`;
+  }
+  const dev = st ? Math.round(x.deviation * 1000) / 10 : x.deviation;
+  return `<h3>Generátor ${g ? (g.enabled ? '<span class="pill ok">běží</span>' : '<span class="pill">vypnutý</span>') : ""}</h3>
+    <p class="muted">${st ? "Hodnota stojí na nominálním stavu, občas na chvíli přejde do jiného stavu a vrátí se."
+      : "Hodnota sleduje nominál s časovou konstantou a přidává se k ní náhodný šum."}</p>
+    <div class="gen-fields">
+      <label for="gnom">${st ? "Nominální stav" : "Nominál"}</label>${nominal}<span class="muted">${st ? "" : "číslo" + esc(unit(n)) + " nebo sousední uzel, např. NominalTemperature; prázdné = aktuální hodnota"}</span>
+      <label for="gdev">${st ? "Odchylka" : "Odchylka σ"}</label><input id="gdev" type="number" step="any" min="0" value="${esc(dev)}"><span class="muted">${st ? "% šance za sekundu" : esc(unit(n).trim() || "")}</span>
+      <label for="gtau">${st ? "Doba odchylky" : "Časová konstanta"}</label><input id="gtau" type="number" step="any" min="0" value="${esc(x.tau)}"><span class="muted">s</span>
     </div>
-    <textarea id="gparams" rows="5">${esc(JSON.stringify(params, null, 1))}</textarea>
-    <p class="muted">Parametry jsou JSON. Perioda je v sekundách. ${n.cls === "S" ? "U stavů jsou klíče vah hodnoty výčtu (např. {\"1\": 5, \"4\": 1})." : "follow sleduje sourozenecký uzel (target), např. NominalTemperature."}</p>`;
+    <div class="row">
+      <label class="chk"><input type="checkbox" id="genabled" ${x.enabled ? "checked" : ""}> zapnutý</label>
+      <button class="primary" id="gsave">${g ? "Uložit generátor" : "Zapnout generátor"}</button>
+      ${g ? '<button id="gdel">Odebrat generátor</button>' : ""}
+    </div>`;
 }
 async function renderEditor() {
   const n = S.byPath[S.sel];
@@ -218,36 +262,20 @@ async function renderEditor() {
     const el = $("#val");
     act(() => api(M("set"), { path: n.path, value: el.value }), "Nastaveno");
   });
-  $("#gkind")?.addEventListener("change", e => {
-    const kinds = n.cls === "A" ? S.tree.analog_kinds : S.tree.state_kinds;
-    const k = e.target.value;
-    if (k) $("#gparams").value = JSON.stringify({ ...S.tree.common, ...kinds[k], ...defaultsFor(n, k) }, null, 1);
-  });
   $("#gsave")?.addEventListener("click", () => {
-    let params;
-    try { params = JSON.parse($("#gparams").value || "{}"); } catch { return toast("Parametry nejsou platný JSON", true); }
-    act(() => api(M("generator"), { path: n.path, kind: $("#gkind").value || null, params, enabled: $("#genabled").checked, seed: $("#gseed").value }), "Generátor uložen")
-      .then(() => { renderTree(); });
+    const st = n.cls === "S";
+    const dev = parseFloat($("#gdev").value || "0");
+    const body = { path: n.path, nominal: $("#gnom").value, deviation: st ? dev / 100 : dev, tau: $("#gtau").value, enabled: $("#genabled").checked };
+    act(() => api(M("generator"), body), "Generátor uložen").then(() => { renderTree(); renderEditor(); });
+  });
+  $("#gdel")?.addEventListener("click", () => {
+    act(() => api(M("generator"), { path: n.path, generate: false }), "Generátor odebrán").then(() => { renderTree(); renderEditor(); });
   });
   $("#callm")?.addEventListener("click", async () => {
     const args = [...document.querySelectorAll("[data-arg]")].map(el => el.value);
     const r = await act(() => api(M("call"), { path: n.path, args }), "Metoda zavolána");
     if (r) $("#callres").textContent = r.result && r.result.length ? JSON.stringify(r.result, null, 1) : "OK";
   });
-}
-function defaultsFor(n, kind) {
-  const v = S.state.values[n.path];
-  if (n.cls === "S" && kind === "weighted" && n.enum) return { weights: Object.fromEntries(Object.keys(n.enum).map(k => [k, 1])) };
-  if (n.cls === "S" && kind === "weighted" && n.type === "Boolean") return { weights: { true: 1, false: 1 } };
-  if (n.cls === "A" && n.range) {
-    const [lo, hi] = n.range;
-    if (kind === "gauss") return { mean: v ?? (lo + hi) / 2, sigma: (hi - lo) / 200 };
-    if (kind === "uniform") return { min: lo, max: hi };
-    if (kind === "walk") return { step: (hi - lo) / 500, min: lo, max: hi };
-    if (kind === "constant") return { value: v ?? lo };
-    if (kind === "sine") return { offset: v ?? (lo + hi) / 2, amplitude: (hi - lo) / 20, period: 60 };
-  }
-  return {};
 }
 function updateEditorValue() {
   const n = S.byPath[S.sel]; const el = $("#liveval");
@@ -387,9 +415,120 @@ $("#side").addEventListener("click", e => {
   if (u) return act(() => api(M("set"), { path: u.dataset.user + "/IsPresent", value: u.dataset.present }), "Hotovo").then(() => (S.sideDirty = true));
 });
 
+// ------------------------------------------------------------- wizard
+const W = { step: 0, cat: null, preset: "generic", form: null, port: "" };
+const LEVELS = [
+  { id: "basic", title: "Základ", fixed: true, d: "Sledování stroje: kdo stroj je, v jakém je stavu a co právě vyrábí.",
+    ex: "Identita, režim (automat, seřizování…), stav výroby, teploty a časy cyklu, čítače dílů, událost po každém cyklu, hlášení a prostoje." },
+  { id: "jobs", title: "Zakázky", d: "MES posílá stroji zakázky a stroj hlásí jejich průběh.",
+    ex: "Spuštění, přerušení a ukončení zakázky, požadovaný počet kusů, dobré díly a zmetky na zakázku." },
+  { id: "datasets", title: "Datové sady", d: "Přenos nastavení stroje (programu formy) mezi strojem a MES.",
+    ex: "Seznam uložených sad, stažení sady ze stroje, nahrání sady do stroje, aktivace sady." },
+];
+async function openWizard() {
+  try { W.cat = await api("/ui/catalog"); } catch (e) { return toast(e.message, true); }
+  if (W.cat.count >= W.cat.max) return toast(`Běží ${W.cat.max} stroje, víc simulátor nepojme. Nejdřív některý odeberte.`, true);
+  W.step = 0; pickPreset("generic"); W.port = W.cat.next_port;
+  $("#wizard").hidden = false; renderWizard();
+}
+function pickPreset(id) {
+  W.preset = id;
+  const e = W.cat.entries.find(x => x.id === id);
+  W.form = JSON.parse(JSON.stringify(e.form));
+  W.title = e.title;
+}
+function readStep() {
+  if (W.step === 0) {
+    for (const el of document.querySelectorAll("#wzBody [data-f]")) {
+      W.form[el.dataset.f] = el.type === "number" ? +el.value : el.value;
+    }
+    W.port = $("#wzPort").value;
+  } else if (W.step === 1) {
+    W.form.facets = [...document.querySelectorAll("#wzBody [data-facet]:checked")].map(x => x.dataset.facet);
+    W.form.options = [...document.querySelectorAll("#wzBody [data-opt]:checked")].map(x => x.dataset.opt);
+  }
+}
+function stepType() {
+  const card = e => `<button type="button" class="opt" data-preset="${e.id}" aria-pressed="${e.id === W.preset}"><span class="t">${esc(e.title)}</span><span class="s">${esc(e.description)}</span></button>`;
+  const f = W.form;
+  const field = (k, label, type = "text", attrs = "") => `<label>${label}<input data-f="${k}" type="${type}" value="${esc(f[k])}" ${attrs}></label>`;
+  return `<h3>Jaký stroj chcete simulovat?</h3>
+    <p class="lead">Vyberte předvolbu, nebo obecný lis, a upravte parametry. Předvolby pilotních strojů jsou odvozené z typového označení.</p>
+    <div><div class="tag">Obecné</div><div class="cards">${W.cat.entries.filter(e => e.id === "generic").map(card).join("")}</div></div>
+    <div><div class="tag">Předvolby pilotních strojů</div><div class="cards">${W.cat.entries.filter(e => e.id !== "generic").map(card).join("")}</div></div>
+    <div><div class="tag">Parametry stroje</div><div class="fields" style="margin-top:6px">
+      ${field("manufacturer", "Výrobce")}${field("model", "Typ")}${field("serial_number", "Sériové číslo")}
+      ${field("controller_name", "Řízení")}${field("machine_name", "Název v hale")}
+      <label>Pohon<select data-f="drive">${W.cat.drives.map(d => `<option ${d === f.drive ? "selected" : ""}>${d}</option>`).join("")}</select></label>
+      ${field("injection_units", "Vstřikovací jednotky", "number", 'min="1" max="4"')}
+      ${field("zones", "Topné zóny válce", "number", 'min="1" max="12"')}
+      ${field("moulds", "Formy", "number", 'min="1" max="2"')}
+      <label>Port OPC UA<input id="wzPort" type="number" min="1" max="65535" value="${esc(W.port)}"></label>
+    </div></div>`;
+}
+function stepModel() {
+  const f = W.form;
+  const lvl = l => l.fixed
+    ? `<div class="level fixed"><input type="checkbox" checked disabled><span class="t">${l.title} <span class="tag">povinné</span></span><span class="d">${l.d}</span><span class="ex">${l.ex}</span></div>`
+    : `<label class="level"><input type="checkbox" data-facet="${l.id}" ${f.facets.includes(l.id) ? "checked" : ""}><span class="t">${l.title}</span><span class="d">${l.d}</span><span class="ex">${l.ex}</span></label>`;
+  const grp = g => {
+    const off = g.needs && !f.facets.includes(g.needs);
+    return `<label class="group ${off ? "off" : ""}"><input type="checkbox" data-opt="${g.id}" ${f.options.includes(g.id) && !off ? "checked" : ""} ${off ? "disabled" : ""}><span>${esc(g.title)}</span><span class="s">${esc(g.text)}${off ? " Jen se zapnutou částí " + (g.needs === "jobs" ? "Zakázky" : "Datové sady") + "." : ""}</span></label>`;
+  };
+  return `<h3>Jaká data má stroj nabízet?</h3>
+    <p class="lead">Datový model je Euromap 77, standard pro komunikaci vstřikovacího lisu s MES. Skládá se z povinného základu a dvou rozšíření. Určuje, co uvidí připojený klient.</p>
+    ${LEVELS.map(lvl).join("")}
+    <div><div class="tag">Volitelné údaje · ${W.cat.groups.filter(g => f.options.includes(g.id) && !(g.needs && !f.facets.includes(g.needs))).length} z ${W.cat.groups.length}</div>
+      <p class="muted" style="margin:4px 0 0">Standard tyto údaje nevyžaduje a skutečné stroje je mají jen někdy. Předvolba je nastaví podle typu stroje.</p>
+      <div class="groups">${W.cat.groups.map(grp).join("")}</div></div>`;
+}
+function stepSummary() {
+  const f = W.form;
+  const parts = ["Základ"].concat(f.facets.includes("jobs") ? ["Zakázky"] : []).concat(f.facets.includes("datasets") ? ["Datové sady"] : []);
+  const opts = W.cat.groups.filter(g => f.options.includes(g.id) && !(g.needs && !f.facets.includes(g.needs))).map(g => g.title);
+  const rows = [
+    ["Předvolba", W.title], ["Stroj", `${f.manufacturer} ${f.model}`], ["Sériové číslo", f.serial_number], ["Řízení", f.controller_name],
+    ["Konfigurace", `${f.drive} pohon, ${f.injection_units}× vstřikovací jednotka, ${f.zones} topných zón, ${f.moulds}× forma`],
+    ["Datový model", "Euromap 77: " + parts.join(" + ")], ["Volitelné údaje", opts.length ? opts.join(", ") : "žádné"],
+    ["Adresa pro klienta", `opc.tcp://<počítač>:${W.port || W.cat.next_port}/`],
+  ];
+  return `<h3>Shrnutí</h3><dl class="sum">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
+    <div class="note">${W.cat.persist ? `Stroj se uloží do <code>${esc(W.cat.save_path)}</code> a naběhne i po příštím spuštění. Smazáním souboru nebo tlačítkem Obnovit výchozí stroje se vrátí původní stroje.`
+      : "Simulátor běží se stroji z příkazové řádky (-m), proto se změna po ukončení neuloží."} Poběží ${W.cat.count + 1}. stroj z ${W.cat.max}.</div>`;
+}
+function renderWizard() {
+  $("#wzBody").innerHTML = [stepType, stepModel, stepSummary][W.step]();
+  for (const li of document.querySelectorAll("#wzSteps li")) { const i = +li.dataset.i; li.className = i === W.step ? "on" : (i < W.step ? "done" : ""); }
+  $("#wzBack").disabled = W.step === 0;
+  $("#wzNext").textContent = W.step === 2 ? "Přidat a spustit" : "Další";
+}
+$("#addMachine").addEventListener("click", openWizard);
+$("#wzClose").addEventListener("click", () => ($("#wizard").hidden = true));
+$("#wizard").addEventListener("keydown", e => { if (e.key === "Escape") $("#wizard").hidden = true; });
+$("#wzBody").addEventListener("click", e => {
+  const b = e.target.closest("[data-preset]"); if (!b) return;
+  pickPreset(b.dataset.preset); renderWizard();
+});
+$("#wzBody").addEventListener("change", e => {
+  if (e.target.dataset.facet) { readStep(); renderWizard(); }
+});
+$("#wzBack").addEventListener("click", () => { readStep(); W.step--; renderWizard(); });
+$("#wzNext").addEventListener("click", async () => {
+  readStep();
+  if (W.step < 2) { W.step++; return renderWizard(); }
+  const btn = $("#wzNext"); btn.disabled = true; btn.textContent = "Spouštím…";
+  try {
+    const r = await api("/ui/fleet/add", { preset: W.preset, title: W.title, form: W.form, port: W.port });
+    $("#wizard").hidden = true;
+    toast(`Stroj ${r.name} běží`);
+    await reloadMachines(r.index);
+  } catch (e) { toast(e.message, true); }
+  btn.disabled = false; renderWizard();
+});
+
 // ------------------------------------------------------------------- loop
 async function poll() {
-  if (!S.tree) return;
+  if (!S.tree || !S.machines.length) return;
   try {
     S.state = await api(M("state"));
   } catch (e) { return; }
@@ -405,8 +544,8 @@ async function poll() {
   renderSide();
 }
 async function main() {
-  await loadMachines();
-  await loadTree();
+  try { S.max = (await api("/ui/catalog")).max; } catch { }
+  await reloadMachines(0);
   setInterval(poll, 1000);
   setInterval(async () => { try { S.machines = await api("/ui/machines"); renderTabs(); } catch { } }, 3000);
 }

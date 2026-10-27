@@ -12,15 +12,13 @@ import threading
 import webbrowser
 
 from . import __version__
-from .config import MAX_MACHINES, builtin_profiles, load_profile
+from .config import DEFAULT_MACHINES, MAX_MACHINES, builtin_profiles, load_profile
+from .fleet import BASE_PORT, SAVE_FILE, Fleet, FleetError
 from .resources import data_dir
 from .sim.machine import Machine
 from .ui.web import WebUI
 
 log = logging.getLogger("e77sim")
-
-DEFAULT_MACHINES = ["arburg_like", "zhafir_like"]
-BASE_PORT = 4840
 
 HELP = """Příkazy konzole:
   s, status   stav strojů
@@ -33,10 +31,12 @@ def parse_args(argv=None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
         prog="e77sim",
         description="Simulátor vstřikovacích lisů s rozhraním Euromap 77 (OPC 40077) přes OPC UA.",
-        epilog=f"Vestavěné profily: {', '.join(builtin_profiles())}. Příklad: e77sim -m arburg_like:4840 -m zhafir_like:4841",
+        epilog=f"Vestavěné profily: {', '.join(builtin_profiles())}. Bez -m se spustí stroje uložené v UI "
+               f"({SAVE_FILE}), jinak {' a '.join(DEFAULT_MACHINES)}. Příklad: e77sim -m arburg_31:4840 -m engel_26:4841",
     )
     p.add_argument("-m", "--machine", action="append", metavar="PROFIL[:PORT]",
-                   help=f"stroj: vestavěný profil nebo cesta k YAML, volitelně s portem (nejvýše {MAX_MACHINES}×)")
+                   help=f"stroj: vestavěný profil nebo cesta k YAML, volitelně s portem (nejvýše {MAX_MACHINES}×); "
+                        f"s -m se změny strojů v UI neukládají")
     p.add_argument("--host", default="0.0.0.0", help="adresa, na které poslouchají OPC UA servery (výchozí 0.0.0.0)")
     p.add_argument("--ui-host", default="127.0.0.1", help="adresa webového UI (výchozí 127.0.0.1, jen lokálně)")
     p.add_argument("--ui-port", type=int, default=8080, help="port webového UI (výchozí 8080)")
@@ -74,35 +74,18 @@ def setup_console(verbose: bool) -> None:
             logging.getLogger(name).setLevel(logging.ERROR)
 
 
-def machine_specs(args) -> list[tuple[dict, int]]:
-    items = args.machine or DEFAULT_MACHINES
+def machine_specs(items: list[str]) -> list[tuple[dict, int | None]]:
+    """Profiles and ports from -m PROFIL[:PORT]; the same profile twice gets a suffix in Fleet.add."""
     if len(items) > MAX_MACHINES:
         raise SystemExit(f"Simulátor podporuje nejvýše {MAX_MACHINES} stroje.")
     out = []
-    used_ports, names = set(), set()
     for i, item in enumerate(items):
         name, port = item, None
         head, sep, tail = item.rpartition(":")
         if sep and tail.isdigit() and not (len(head) == 1 and os.name == "nt"):
             name, port = head, int(tail)
         prof = copy.deepcopy(load_profile(name))
-        port = port or int(prof.get("port") or BASE_PORT + i)
-        while port in used_ports:
-            port += 1
-        used_ports.add(port)
-        # The same profile twice needs a different serial number, so the machines are distinguishable
-        sn = str(prof["identity"]["serial_number"])
-        key = (prof["identity"]["manufacturer"], sn)
-        n = 2
-        while key in names:
-            key = (prof["identity"]["manufacturer"], f"{sn}-{n}")
-            n += 1
-        names.add(key)
-        prof["identity"]["serial_number"] = key[1]
-        if key[1] != sn:
-            conf = prof.setdefault("configuration", {})
-            conf["user_machine_name"] = f"{conf.get('user_machine_name', 'Lis')} ({n - 1})"
-        out.append((prof, port))
+        out.append((prof, port or int(prof.get("port") or BASE_PORT + i)))
     return out
 
 
@@ -129,32 +112,27 @@ def print_status(machines: list[Machine], ui: WebUI) -> None:
 
 
 async def run(args) -> int:
-    specs = machine_specs(args)
     ddir = data_dir() if not args.data_dir else __import__("pathlib").Path(args.data_dir)
     ddir.mkdir(parents=True, exist_ok=True)
-    print(f"Euromap 77 Simulator {__version__} – spouštím {len(specs)} stroj(e)…")
-    machines = []
     passwords = {"OPC40077": args.password, "OPC40077_read_only": args.password_read_only}
-    for i, (prof, port) in enumerate(specs):
-        seed = None if args.seed is None else args.seed + i
-        m = Machine(prof, port, args.host, ddir, seed=seed, passwords=passwords,
-                    allow_anonymous=not args.no_anonymous, security=not args.no_security)
-        try:
-            await m.start()
-        except OSError as e:
-            print(f"Port {port} pro {m.name} nelze otevřít: {e}")
-            for x in machines:
-                await x.stop()
-            return 2
-        machines.append(m)
+    fleet = Fleet(ddir, args.host, seed=args.seed, passwords=passwords, allow_anonymous=not args.no_anonymous,
+                  security=not args.no_security, persist=not args.machine)
+    specs = machine_specs(args.machine) if args.machine else (fleet.saved_specs() or fleet.default_specs())
+    print(f"Euromap 77 Simulator {__version__} – spouštím {len(specs)} stroj(e)…")
+    try:
+        await fleet.start(specs)
+    except FleetError as e:
+        print(e)
+        await fleet.stop()
+        return 2
+    machines = fleet.machines
 
-    ui = WebUI(machines, args.ui_host, args.ui_port)
+    ui = WebUI(fleet, args.ui_host, args.ui_port)
     try:
         await ui.start()
     except OSError as e:
         print(f"Web UI nelze spustit na portu {args.ui_port}: {e}. Zkuste --ui-port.")
-        for m in machines:
-            await m.stop()
+        await fleet.stop()
         return 2
 
     print("\n" + "=" * 78)
@@ -163,6 +141,8 @@ async def run(args) -> int:
         print(f" {m.profile.get('profile', ''):<12} {m.name:<34} {m.endpoint}")
     print(f" Bezpečnost: None{'' if args.no_security else ', Basic256 a Basic256Sha256 (Sign, SignAndEncrypt)'}")
     print(f" Uživatelé: {'anonymní, ' if not args.no_anonymous else ''}OPC40077, OPC40077_read_only")
+    print(f" Stroje lze přidat a odebrat za běhu v UI (nejvýše {MAX_MACHINES})"
+          f"{'' if fleet.persist else '; s -m se změny neukládají'}.")
     print("=" * 78)
     print(HELP)
 
@@ -189,8 +169,7 @@ async def run(args) -> int:
     finally:
         print("Ukončuji…")
         await ui.stop()
-        for m in machines:
-            await m.stop()
+        await fleet.stop()
     return 0
 
 

@@ -15,6 +15,7 @@ from typing import Any
 from asyncua import Server, ua
 from asyncua.common.callback import CallbackType
 
+from ..catalog import option_patterns
 from ..opcua.builder import Builder, NodeSpec, coerce, make_variant, match_any
 from ..opcua.events import Events
 from ..opcua.server import NS_DI, NS_IMM, create_server
@@ -85,7 +86,9 @@ class Machine:
         self.running = False
         self.cycle_enabled = True
         self.event_log: deque = deque(maxlen=200)
-        self.cycle_cfg: dict[str, dict] = {k: dict(v) for k, v in (profile.get("cycle", {}).get("parameters") or {}).items()}
+        self.cycle_cfg: dict[str, dict] = {k: dict(v) for k, v in (profile.get("cycle", {}).get("parameters") or {}).items()
+                                           if "options" not in profile or "cycle" in profile["options"]
+                                           or k in MANDATORY_CYCLE_PARAMS}
         self.last_cycle: dict[str, Any] = {}
         self.cycle_times: deque = deque(maxlen=10)
         self.cycle_progress = 0.0
@@ -179,7 +182,7 @@ class Machine:
             asyncio.create_task(self._cycle_loop(), name=f"{self.name}-cycle"),
             asyncio.create_task(self._watchdog_loop(), name=f"{self.name}-watchdog"),
         ]
-        log.info("%s (%s) běží na %s", self.name, self.profile.get("profile", ""), self.endpoint)
+        log.info("%s (%s) běží na %s", self.name, self.profile.get("title", ""), self.endpoint)
 
     async def stop(self) -> None:
         for t in self._tasks:
@@ -216,12 +219,12 @@ class Machine:
             return True  # the facet requires the object
         if decl.name == "EngineeringUnits":
             return unit_code(path.rsplit("/", 2)[-2]) is not None
-        if rel == "MachineConfiguration/GetCurrentPage" or rel == "MachineConfiguration/GetPage":
-            return self.profile.get("optional", "all") == "all" and not match_any(path, self.profile.get("exclude") or [])
         if rel.startswith("InjectionUnits/") and rel.endswith("/ScrewId"):
             return bool(self._unit_cfg(rel).get("screw_id"))
         if rel.startswith("PowerUnits/") and rel.endswith("/ActualTemperature"):
             return self._power_cfg(rel).get("oil_temperature") is not None
+        if "options" in self.profile:
+            return match_any(path, option_patterns(self.profile["options"]) + (self.profile.get("include") or []))
         mode = self.profile.get("optional", "all")
         if mode == "all":
             return not match_any(path, self.profile.get("exclude") or [])
@@ -813,26 +816,40 @@ class Machine:
             for path, spec in self.specs.items():
                 if spec.cls in ("A", "S") and fnmatch.fnmatchcase(self.rel(path), g["path"]):
                     seed = None if self.seed is None else hash((self.seed, path)) & 0xFFFFFFFF
-                    self.generators[path] = gens.make(g["kind"], g.get("params"), seed=seed,
-                                                      enabled=g.get("enabled", True))
+                    params = {k: v for k, v in g.items() if k not in ("path", "enabled")}
+                    self.generators[path] = gens.make(params, seed=seed, enabled=g.get("enabled", True))
 
-    def set_generator(self, rel: str, kind: str | None, params: dict | None = None, enabled: bool = True,
-                      seed: int | None = None) -> None:
+    def set_generator(self, rel: str, params: dict | None, enabled: bool = True) -> None:
+        """`params` None removes the generator of the node."""
         spec = self.specs[self.p(rel)]
         if spec.cls not in ("A", "S"):
             raise ValueError("generátor jde nastavit jen u analogových (A) a stavových (S) uzlů")
-        if not kind:
+        if params is None:
             self.generators.pop(spec.path, None)
             return
-        if spec.cls == "A" and kind not in gens.ANALOG_KINDS or spec.cls == "S" and kind not in gens.STATE_KINDS:
-            raise ValueError(f"generátor {kind} se k uzlu třídy {spec.cls} nehodí")
-        self.generators[spec.path] = gens.make(kind, params, seed=seed, enabled=enabled)
+        params = dict(params)
+        if spec.cls == "S":
+            choices = self.state_choices(spec)
+            nominal = gens._typed(params.get("nominal"))
+            if nominal is not None and nominal not in choices:
+                raise ValueError("nominální stav není ve výčtu uzlu")
+            dev = float(params.get("deviation") or 0)
+            if not 0 <= dev <= 1:
+                raise ValueError("u stavu je odchylka pravděpodobnost 0 až 1")
+        seed = None if self.seed is None else hash((self.seed, spec.path)) & 0xFFFFFFFF
+        self.generators[spec.path] = gens.make(params, seed=seed, enabled=enabled)
+
+    @staticmethod
+    def state_choices(spec: NodeSpec) -> list:
+        if spec.enum:
+            return list(spec.enum)
+        return [True, False] if spec.vtype == ua.VariantType.Boolean else []
 
     def randomize_all(self) -> None:
         for path, spec in self.specs.items():
             if spec.cls == "A" and path not in self.generators and spec.eurange:
                 lo, hi = spec.eurange
-                self.generators[path] = gens.make("walk", {"step": (hi - lo) * 0.002, "min": lo, "max": hi})
+                self.generators[path] = gens.make({"nominal": None, "deviation": (hi - lo) * 0.002, "tau": 10})
         for g in self.generators.values():
             g.enabled = True
 
@@ -849,10 +866,11 @@ class Machine:
                 spec = self.specs[path]
                 parent = path.rsplit("/", 1)[0]
                 siblings = {s.name: self.values.get(p) for p, s in self.specs.items()
-                            if p.rsplit("/", 1)[0] == parent} if g.kind == "follow" else {}
+                            if p.rsplit("/", 1)[0] == parent} if isinstance(g.nominal, str) else {}
                 lo, hi = spec.eurange or (float("-inf"), float("inf"))
+                choices = self.state_choices(spec) if spec.cls == "S" else None
                 try:
-                    new = g.step(self.values.get(path), lo, hi, siblings, now)
+                    new = g.step(self.values.get(path), lo, hi, siblings, now, choices)
                 except Exception as e:  # bad parameters from the UI
                     g.enabled = False
                     log.warning("%s: generátor %s vypnut: %s", self.name, self.rel(path), e)

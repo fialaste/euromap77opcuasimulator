@@ -161,14 +161,14 @@ async def test_logbook_history(arburg):
 async def test_read_only_user_cannot_write(tmp_path):
     from conftest import start_machine
 
-    m = await start_machine("zhafir_like", tmp_path)
+    m = await start_machine("zhafir_22", tmp_path)
     try:
         c = Client(m.endpoint)
         c.set_user("OPC40077_read_only")
         c.set_password("")
         async with c:
             node = c.get_node(nid(m, "MachineConfiguration/LocationName"))
-            assert await node.read_value() == "Hala A / linka 2"
+            assert await node.read_value() == m.get("MachineConfiguration/LocationName")
             with pytest.raises(ua.UaStatusCodeError):
                 await node.write_value("X")
         c = Client(m.endpoint)
@@ -262,7 +262,7 @@ async def test_secure_endpoints(tmp_path, policy):
 
     from conftest import start_machine
 
-    m = await start_machine("zhafir_like", tmp_path / "srv")
+    m = await start_machine("zhafir_22", tmp_path / "srv")
     try:
         key, cert = tmp_path / "client.pem", tmp_path / "client.der"
         await setup_self_signed_certificate(key, cert, "urn:e77sim:test-client", "localhost",

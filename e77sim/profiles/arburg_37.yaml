@@ -1,0 +1,35 @@
+# Pilotní stroj 37. Čísla jednotek a zón odvozená z typového označení, neověřená.
+extends: generic
+title: Arburg 370 E 600-170
+description: Stroj 37 · SELOGICA · elektrický
+drive: elektrický
+
+identity:
+  manufacturer: ARBURG
+  manufacturer_uri: https://www.arburg.com
+  device_manual: https://www.arburg.com
+  model: ALLROUNDER 370 E 600-170
+  serial_number: "PILOT-37"
+  controller_name: SELOGICA
+  product_code: 370E-600-170
+  asset_id: "37"
+  component_name: Lis 37
+
+configuration:
+  user_machine_name: Lis 37
+
+facets: [jobs]
+options: [identity, screw, zones, cycle, users, mes, sleep, page, jobs_ext]
+
+injection_units:
+  - barrel_id: BAR-170-37
+    screw_id: SCR-25-37
+    screw_diameter: 25
+    max_screw_stroke: 100
+    screw_volume: 49
+    zones:
+      - {name: Nozzle, nominal: 240}
+      - {name: Zone 1, nominal: 235}
+      - {name: Zone 2, nominal: 230}
+      - {name: Zone 3, nominal: 220}
+      - {name: Feed zone, nominal: 45, classification: COOLING}

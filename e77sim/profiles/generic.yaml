@@ -1,30 +1,30 @@
-# Arburg-like profile: all three OPC 40077 profiles and most optional nodes.
-# Values follow common practice for a ~1000 kN electric machine, not a real machine export.
-profile: Arburg-like
-port: 4840
+# Obecný vstřikovací lis: základ všech předvoleb v katalogu.
+# Plný Euromap 77: Basic + Jobs + ProductionDatasetManagement a všechny volitelné skupiny uzlů.
+# Hodnoty odpovídají běžnému elektrickému lisu kolem 1000 kN, nejsou z exportu reálného stroje.
+title: Obecný vstřikovací lis
+description: Prázdná šablona s plným Euromap 77, vše nastavíte sami.
+drive: elektrický
 
 identity:
-  manufacturer: ARBURG
-  manufacturer_uri: https://www.arburg.com
-  model: ALLROUNDER 470 A
-  serial_number: "0123456"
-  controller_name: GESTICA
-  product_code: 470A-1000-290
+  manufacturer: SIMULATOR
+  manufacturer_uri: https://github.com/fialaste/euromap77opcuasimulator
+  model: IMM 1000
+  serial_number: "0001"
+  controller_name: E77SIM
+  product_code: IMM-1000
   hardware_revision: "1.0"
-  software_revision: "3.6.2"
+  software_revision: "2.0"
   device_revision: "1"
-  device_manual: https://www.arburg.com
+  device_manual: https://github.com/fialaste/euromap77opcuasimulator
   asset_id: IMM-01
   component_name: Lis 01
 
 # Facets on top of the Basic Server Profile: jobs, datasets
 facets: [jobs, datasets]
 
-# Optional nodes: "all" builds every optional node except those matching `exclude`,
-# "none" builds only mandatory nodes plus those matching `include`.
-optional: all
-exclude: []
-include: []
+# Groups of optional nodes (see e77sim/catalog.py): identity, screw, zones, cycle, users, mes, sleep, page,
+# jobs_ext, datasets_ext. Instead of `options` a profile may use `optional: all|none` with `include`/`exclude` globs.
+options: [identity, screw, zones, cycle, users, mes, sleep, page, jobs_ext, datasets_ext]
 
 configuration:
   user_machine_name: Lis 01
@@ -124,8 +124,15 @@ cycle:
     VPChangeOverPosition: {nominal: 13.5, sigma: 0.15}
 
 # Default generators. `path` is a glob over the node path below the machine root.
-# Kinds: constant, uniform, gauss, walk, follow, sine (analog); weighted, markov, sequence (state)
+# One principle for all: the value follows `nominal` (a number or a sibling node) with the time constant
+# `tau` in seconds and noise `deviation`. For a state node `nominal` is a state, `deviation` the
+# probability per second of a short excursion to another state and `tau` its length in seconds.
 generators:
   - path: "*/TemperatureZones/*/ActualTemperature"
-    kind: follow
-    params: {target: NominalTemperature, tau: 60, sigma: 0.3}
+    nominal: NominalTemperature
+    deviation: 0.3
+    tau: 60
+  - path: "*/PowerUnits/*/ActualTemperature"
+    nominal: 45
+    deviation: 0.2
+    tau: 120

@@ -1,0 +1,23 @@
+# Pilotní stroj 31. Čísla jednotek a zón odvozená z typového označení, neověřená.
+extends: generic
+title: Arburg 470 E 1000-290 Golden
+description: Stroj 31 · SELOGICA · elektrický
+drive: elektrický
+
+identity:
+  manufacturer: ARBURG
+  manufacturer_uri: https://www.arburg.com
+  device_manual: https://www.arburg.com
+  model: ALLROUNDER 470 E 1000-290 GOLDEN ELECTRIC
+  serial_number: "PILOT-31"
+  controller_name: SELOGICA
+  product_code: 470E-1000-290
+  asset_id: "31"
+  component_name: Lis 31
+
+configuration:
+  user_machine_name: Lis 31
+
+# Do dodání seznamu uzlů: Basic + Jobs
+facets: [jobs]
+options: [identity, screw, zones, cycle, users, mes, sleep, page, jobs_ext]

@@ -1,0 +1,37 @@
+# Pilotní stroj 22. Popis dostupných dat chybí, proto jen povinné uzly (Basic + Jobs).
+# Čísla jednotek a zón jsou odhad, neověřená.
+extends: generic
+title: Zhafir Zeres ZE1500III
+description: Stroj 22 · elektrický
+drive: elektrický
+
+identity:
+  manufacturer: ZHAFIR
+  manufacturer_uri: https://www.zhafir.com
+  device_manual: https://www.zhafir.com
+  model: Zeres ZE1500III
+  serial_number: "PILOT-22"
+  controller_name: KEBA
+  product_code: Zeres-ZE1500III
+  asset_id: "22"
+  component_name: Lis 22
+
+configuration:
+  user_machine_name: Lis 22
+
+facets: [jobs]
+options: []
+
+injection_units:
+  - barrel_id: BAR-22
+    screw_id: SCR-45-22
+    screw_diameter: 45
+    max_screw_stroke: 200
+    screw_volume: 318
+    zones:
+      - {name: Nozzle, nominal: 240}
+      - {name: Zone 1, nominal: 235}
+      - {name: Zone 2, nominal: 230}
+      - {name: Zone 3, nominal: 225}
+      - {name: Zone 4, nominal: 220}
+      - {name: Zone 5, nominal: 215}
