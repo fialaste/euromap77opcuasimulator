@@ -153,10 +153,11 @@ class WebUI:
             await self.runner.cleanup()
 
     def m(self, request) -> Machine:
-        i = int(request.match_info["i"])
-        if not 0 <= i < len(self.machines):
+        """Machines are addressed by name, so a stale page never reaches another machine after a removal."""
+        m = self.fleet.find(request.match_info["i"])
+        if m is None:
             raise web.HTTPNotFound()
-        return self.machines[i]
+        return m
 
     async def index(self, request):
         return web.FileResponse(static_dir() / "index.html", headers={"Cache-Control": "no-cache"})
@@ -226,8 +227,8 @@ class WebUI:
     async def fleet_remove(self, request):
         body = await request.json()
         try:
-            await self.fleet.remove(int(body["index"]))
-        except (FleetError, ValueError, KeyError) as e:
+            await self.fleet.remove(str(body["name"]))
+        except (FleetError, KeyError) as e:
             return web.json_response({"error": str(e)}, status=400)
         self._method_info.clear()
         return web.json_response({"ok": True})

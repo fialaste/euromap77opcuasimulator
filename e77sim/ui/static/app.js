@@ -23,7 +23,7 @@ function toast(msg, err) {
 async function act(fn, ok) {
   try { const r = await fn(); if (ok) toast(ok); await poll(); return r; } catch (e) { toast(e.message, true); }
 }
-const M = p => `/ui/m/${S.cur}/${p}`;
+const M = p => `/ui/m/${encodeURIComponent(S.machines[S.cur]?.name ?? "")}/${p}`;
 
 function fmt(v, node) {
   if (v === null || v === undefined) return "—";
@@ -119,7 +119,7 @@ function renderOverview() {
 }
 $("#overview").addEventListener("click", e => {
   if (e.target.id === "removeMachine") return confirmClick(e.target, "Opravdu odebrat?", () =>
-    act(() => api("/ui/fleet/remove", { index: S.cur }), "Stroj odebrán").then(() => reloadMachines(Math.max(0, S.cur - 1))));
+    act(() => api("/ui/fleet/remove", { name: S.machines[S.cur].name }), "Stroj odebrán").then(() => reloadMachines(Math.max(0, S.cur - 1))));
   const b = e.target.closest("button[data-a]"); if (!b) return;
   act(() => api(M("action"), { action: b.dataset.a }));
 });
@@ -429,7 +429,13 @@ async function openWizard() {
   try { W.cat = await api("/ui/catalog"); } catch (e) { return toast(e.message, true); }
   if (W.cat.count >= W.cat.max) return toast(`Běží ${W.cat.max} stroje, víc simulátor nepojme. Nejdřív některý odeberte.`, true);
   W.step = 0; pickPreset("generic"); W.port = W.cat.next_port;
+  W.opener = document.activeElement;
   $("#wizard").hidden = false; renderWizard();
+  $("#wizard .dialog [data-preset]")?.focus();
+}
+function closeWizard() {
+  $("#wizard").hidden = true;
+  W.opener?.focus?.();
 }
 function pickPreset(id) {
   W.preset = id;
@@ -503,8 +509,19 @@ function renderWizard() {
   $("#wzNext").textContent = W.step === 2 ? "Přidat a spustit" : "Další";
 }
 $("#addMachine").addEventListener("click", openWizard);
-$("#wzClose").addEventListener("click", () => ($("#wizard").hidden = true));
-$("#wizard").addEventListener("keydown", e => { if (e.key === "Escape") $("#wizard").hidden = true; });
+$("#wzClose").addEventListener("click", closeWizard);
+// While the wizard is open, Escape closes it and Tab stays inside the dialog
+document.addEventListener("keydown", e => {
+  if ($("#wizard").hidden) return;
+  if (e.key === "Escape") return closeWizard();
+  if (e.key !== "Tab") return;
+  const f = [...$("#wizard .dialog").querySelectorAll("button, input, select, a[href]")].filter(x => !x.disabled && x.offsetParent);
+  if (!f.length) return;
+  const first = f[0], last = f[f.length - 1];
+  if (!$("#wizard .dialog").contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+  else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
 $("#wzBody").addEventListener("click", e => {
   const b = e.target.closest("[data-preset]"); if (!b) return;
   pickPreset(b.dataset.preset); renderWizard();
@@ -519,7 +536,7 @@ $("#wzNext").addEventListener("click", async () => {
   const btn = $("#wzNext"); btn.disabled = true; btn.textContent = "Spouštím…";
   try {
     const r = await api("/ui/fleet/add", { preset: W.preset, title: W.title, form: W.form, port: W.port });
-    $("#wizard").hidden = true;
+    closeWizard();
     toast(`Stroj ${r.name} běží`);
     await reloadMachines(r.index);
   } catch (e) { toast(e.message, true); }

@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 import yaml
 
@@ -63,7 +65,9 @@ async def test_add_remove_save_and_reset(tmp_path):
         saved = yaml.safe_load((tmp_path / SAVE_FILE).read_text(encoding="utf-8"))
         assert [x["profile"]["preset"] for x in saved["machines"]] == DEFAULT_MACHINES + ["engel_26"]
 
-        await f.remove(0)
+        await f.remove(f.machines[0].name)
+        with pytest.raises(FleetError):
+            await f.remove("IMM_NONE")
         await f.add(load_profile("engel_26"))  # same type twice gets its own serial number
         names = [m.name for m in f.machines]
         assert len(set(names)) == 3 and len(set(ports(f))) == 3
@@ -83,3 +87,27 @@ async def test_add_remove_save_and_reset(tmp_path):
 def test_broken_save_file_falls_back_to_defaults(tmp_path):
     (tmp_path / SAVE_FILE).write_text("machines: [{profile: {identity: {}}}]", encoding="utf-8")
     assert fleet(tmp_path).saved_specs() is None
+
+
+async def test_parallel_adds_respect_the_limit(tmp_path):
+    f = fleet(tmp_path, persist=False)
+    try:
+        res = await asyncio.gather(*(f.add(load_profile("zhafir_22")) for _ in range(4)), return_exceptions=True)
+        assert sum(isinstance(r, FleetError) for r in res) == 1
+        assert len(f.machines) == 3 and len(set(ports(f))) == 3 and len({m.name for m in f.machines}) == 3
+    finally:
+        await f.stop()
+
+
+async def test_empty_saved_fleet_stays_empty_and_reset_without_saving_keeps_the_file(tmp_path):
+    f = fleet(tmp_path)
+    await f.start([(load_profile("zhafir_22"), None)])
+    await f.remove(f.machines[0].name)
+    assert fleet(tmp_path).saved_specs() == []
+
+    g = fleet(tmp_path, persist=False)
+    try:
+        await g.reset()
+        assert (tmp_path / SAVE_FILE).exists()
+    finally:
+        await g.stop()

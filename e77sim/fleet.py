@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import logging
 from pathlib import Path
@@ -37,6 +38,7 @@ class Fleet:
         self.persist = persist
         self.machines: list[Machine] = []
         self._started = 0
+        self._lock = asyncio.Lock()  # one add, remove or reset at a time
 
     @property
     def save_path(self) -> Path:
@@ -100,6 +102,10 @@ class Fleet:
         return prof
 
     async def add(self, prof: dict, port: int | None = None, save: bool = True) -> Machine:
+        async with self._lock:
+            return await self._add(prof, port, save)
+
+    async def _add(self, prof: dict, port: int | None, save: bool) -> Machine:
         if len(self.machines) >= MAX_MACHINES:
             raise FleetError(f"Simulátor pojme nejvýše {MAX_MACHINES} stroje. Nejdřív některý odeberte.")
         validate(prof, "stroj")
@@ -120,26 +126,38 @@ class Fleet:
             self.save()
         return m
 
-    async def remove(self, index: int) -> None:
-        if not 0 <= index < len(self.machines):
-            raise FleetError("takový stroj neběží")
-        m = self.machines.pop(index)
-        await m.stop()
-        log.info("Odebrán stroj %s", m.name)
-        self.save()
+    def find(self, name: str) -> Machine | None:
+        return next((m for m in self.machines if m.name == name), None)
+
+    async def remove(self, name: str) -> None:
+        async with self._lock:
+            m = self.find(name)
+            if m is None:
+                raise FleetError(f"stroj {name} neběží")
+            self.machines.remove(m)
+            await m.stop()
+            log.info("Odebrán stroj %s", m.name)
+            self.save()
 
     async def start(self, specs: list[tuple[dict, int | None]]) -> None:
-        for prof, port in specs[:MAX_MACHINES]:
-            await self.add(prof, port, save=False)
+        async with self._lock:
+            for prof, port in specs[:MAX_MACHINES]:
+                await self._add(prof, port, save=False)
 
     async def reset(self) -> None:
-        """Back to the default machines; the saved file is deleted."""
-        await self.stop()
-        if self.save_path.is_file():
-            self.save_path.unlink()
-        await self.start(self.default_specs())
+        """Back to the default machines; the saved file is deleted (kept when nothing is saved, i.e. with -m)."""
+        async with self._lock:
+            await self._stop_all()
+            if self.persist and self.save_path.is_file():
+                self.save_path.unlink()
+            for prof, port in self.default_specs():
+                await self._add(prof, port, save=False)
 
     async def stop(self) -> None:
+        async with self._lock:
+            await self._stop_all()
+
+    async def _stop_all(self) -> None:
         while self.machines:
             await self.machines.pop().stop()
 

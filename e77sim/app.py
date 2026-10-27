@@ -117,7 +117,12 @@ async def run(args) -> int:
     passwords = {"OPC40077": args.password, "OPC40077_read_only": args.password_read_only}
     fleet = Fleet(ddir, args.host, seed=args.seed, passwords=passwords, allow_anonymous=not args.no_anonymous,
                   security=not args.no_security, persist=not args.machine)
-    specs = machine_specs(args.machine) if args.machine else (fleet.saved_specs() or fleet.default_specs())
+    if args.machine:
+        specs = machine_specs(args.machine)
+    else:
+        specs = fleet.saved_specs()
+        if specs is None:  # an empty saved list means the user removed every machine
+            specs = fleet.default_specs()
     print(f"Euromap 77 Simulator {__version__} – spouštím {len(specs)} stroj(e)…")
     try:
         await fleet.start(specs)
