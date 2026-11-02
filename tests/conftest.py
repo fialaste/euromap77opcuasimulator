@@ -5,8 +5,8 @@ import socket
 import pytest
 import pytest_asyncio
 
-from e77sim.config import load_profile
-from e77sim.sim.machine import Machine
+from emsim.config import load_profile
+from emsim.sim.machine import Machine
 
 logging.getLogger("asyncua").setLevel(logging.ERROR)
 

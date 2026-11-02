@@ -8,7 +8,7 @@ import random
 from dataclasses import dataclass, field
 from typing import Any
 
-log = logging.getLogger("e77sim")
+log = logging.getLogger("emsim")
 
 PERIOD = 1.0  # seconds between two steps of a generator
 

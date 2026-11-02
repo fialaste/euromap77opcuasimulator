@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "e77sim"
-version = "1.1.0"
-description = "Euromap 77 (OPC 40077) OPC UA simulator of injection moulding machines"
+name = "emsim"
+version = "1.2.0"
+description = "OPC UA simulator of injection moulding machines (EUROMAP 77 over EUROMAP 83)"
 requires-python = ">=3.11"
 dependencies = ["asyncua>=1.1", "aiohttp>=3.9", "PyYAML>=6"]
 
@@ -13,13 +13,13 @@ dependencies = ["asyncua>=1.1", "aiohttp>=3.9", "PyYAML>=6"]
 dev = ["pytest>=8", "pytest-asyncio>=0.23", "pyinstaller>=6"]
 
 [project.scripts]
-e77sim = "e77sim.app:main"
+emsim = "emsim.app:main"
 
 [tool.setuptools.packages.find]
-include = ["e77sim*"]
+include = ["emsim*"]
 
 [tool.setuptools.package-data]
-e77sim = ["nodesets/*.xml", "profiles/*.yaml", "ui/static/*"]
+emsim = ["nodesets/*.xml", "profiles/*.yaml", "ui/static/*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

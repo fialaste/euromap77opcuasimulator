@@ -1,4 +1,4 @@
-from e77sim.sim import generators as gens
+from emsim.sim import generators as gens
 
 
 def run(g, start, n=200, lo=0.0, hi=500.0, siblings=None, choices=None):

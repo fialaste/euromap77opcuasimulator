@@ -13,7 +13,7 @@ import yaml
 from .config import DEFAULT_MACHINES, MAX_MACHINES, load_profile, validate
 from .sim.machine import Machine
 
-log = logging.getLogger("e77sim")
+log = logging.getLogger("emsim")
 
 BASE_PORT = 4840
 SAVE_FILE = "stroje.yaml"

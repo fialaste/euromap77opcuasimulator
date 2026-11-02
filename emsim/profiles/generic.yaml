@@ -10,7 +10,7 @@ identity:
   manufacturer_uri: https://github.com/fialaste/euromap77opcuasimulator
   model: IMM 1000
   serial_number: "0001"
-  controller_name: E77SIM
+  controller_name: EMSIM
   product_code: IMM-1000
   hardware_revision: "1.0"
   software_revision: "2.0"
@@ -22,7 +22,7 @@ identity:
 # Facets on top of the Basic Server Profile: jobs, datasets
 facets: [jobs, datasets]
 
-# Groups of optional nodes (see e77sim/catalog.py): identity, screw, zones, cycle, users, mes, sleep, page,
+# Groups of optional nodes (see emsim/catalog.py): identity, screw, zones, cycle, users, mes, sleep, page,
 # jobs_ext, datasets_ext. Instead of `options` a profile may use `optional: all|none` with `include`/`exclude` globs.
 options: [identity, screw, zones, cycle, users, mes, sleep, page, jobs_ext, datasets_ext]
 

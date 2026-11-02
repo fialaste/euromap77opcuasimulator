@@ -1,4 +1,4 @@
-# Euromap 77 OPC UA simulátor
+# Euromap Simulator
 
 Simulátor vstřikovacích lisů s rozhraním **Euromap 77 / OPC 40077 v1.01** (IMM2MES) nad OPC 40083 a OPC UA DI. Slouží k vývoji a testování OPC UA klientů bez fyzických strojů. Jeden spustitelný soubor spustí až tři stroje, každý na vlastním OPC UA portu, a k nim lokální webové UI. Stroje jde za běhu přidávat z katalogu a odebírat. V konzoli běží log a jednoduché příkazy.
 
@@ -6,10 +6,10 @@ Návrh a datový model jsou v [docs/plan.md](docs/plan.md) a [docs/datovy_model.
 
 ## Spuštění
 
-Hotový soubor pro Windows (`e77sim-<verze>-windows-x64.exe`) nebo Linux (`e77sim-<verze>-linux-x64`) stáhnete z [Releases](https://github.com/fialaste/euromap77opcuasimulator/releases). Stačí ho spustit, nic se neinstaluje:
+Hotový soubor pro Windows (`emsim-<verze>-windows-x64.exe`) nebo Linux (`emsim-<verze>-linux-x64`) stáhnete z [Releases](https://github.com/fialaste/euromap77opcuasimulator/releases). Stačí ho spustit, nic se neinstaluje:
 
 ```
-e77sim.exe
+emsim.exe
 ```
 
 Bez parametrů se spustí dva výchozí stroje a otevře se prohlížeč s UI. Třetí místo je volné pro stroj, který si přidáte v UI:
@@ -24,7 +24,7 @@ Web UI běží na `http://127.0.0.1:8080/`. Konzole přijímá příkazy `s` (st
 Vlastní sestava strojů z příkazové řádky, nejvýše tři (změny strojů v UI se pak neukládají):
 
 ```
-e77sim.exe -m arburg_31:4840 -m engel_26:4841 -m muj_stroj.yaml:4842
+emsim.exe -m arburg_31:4840 -m engel_26:4841 -m muj_stroj.yaml:4842
 ```
 
 | Parametr | Význam |
@@ -37,7 +37,7 @@ e77sim.exe -m arburg_31:4840 -m engel_26:4841 -m muj_stroj.yaml:4842
 | `--no-security` | jen endpoint bez zabezpečení |
 | `--no-anonymous` | zakázat anonymní přihlášení |
 | `--password`, `--password-read-only` | hesla uživatelů `OPC40077` a `OPC40077_read_only`; prázdné heslo přijme cokoli |
-| `--data-dir` | složka pro certifikáty a uložené stroje (`stroje.yaml`), výchozí `e77sim-data` vedle programu |
+| `--data-dir` | složka pro certifikáty a uložené stroje (`stroje.yaml`), výchozí `emsim-data` vedle programu; složka `e77sim-data` ze starších verzí se při spuštění sama přejmenuje |
 
 ## Co simulátor dělá
 
@@ -51,17 +51,17 @@ e77sim.exe -m arburg_31:4840 -m engel_26:4841 -m muj_stroj.yaml:4842
 
 **Události.** Logbook posílá konkrétní podtypy abstraktních typů OPC 40077: změna parametru, uživatele, MachineMode, ProductionStatus, datové sady, zmrazení sady, důvod prostoje a hlášení. `EventOriginator` rozlišuje stroj, obsluhu v UI a MES. Události jdou na objekt stroje i na objekt Server a logbook drží posledních 1000 událostí pro HistoryRead. Z UI jde vyvolat hlášení (i s prostojem) a požadavky stroje na MES (`Request*EventType`).
 
-**Bezpečnost (kap. 6).** Endpointy None, Basic256 a Basic256Sha256 v režimech Sign a SignAndEncrypt. Certifikát serveru se vygeneruje při prvním spuštění do `e77sim-data/pki`, klientské certifikáty se přijímají všechny. Uživatelé `OPC40077` (čtení, zápis, metody) a `OPC40077_read_only` (bez zápisu a volání metod), pro testy i anonymní přístup.
+**Bezpečnost (kap. 6).** Endpointy None, Basic256 a Basic256Sha256 v režimech Sign a SignAndEncrypt. Certifikát serveru se vygeneruje při prvním spuštění do `emsim-data/pki`, klientské certifikáty se přijímají všechny. Uživatelé `OPC40077` (čtení, zápis, metody) a `OPC40077_read_only` (bez zápisu a volání metod), pro testy i anonymní přístup.
 
 ## Stroje za běhu
 
 Tlačítko **+ Přidat stroj** otevře průvodce o třech krocích:
 
 1. **Typ stroje**: obecný vstřikovací lis nebo předvolba pilotního stroje, k tomu výrobce, typ, sériové číslo, řízení, název v hale, pohon, počet vstřikovacích jednotek, topných zón a forem a port.
-2. **Datový model**: Euromap 77 s povinným základem (sledování stroje) a dvěma rozšířeními, Zakázky (Jobs) a Datové sady (ProductionDatasetManagement). Volitelné uzly se zapínají po srozumitelných skupinách, například *Šnek a válec*, *Řízení z MES* nebo *Podrobné cyklové parametry*. Skupiny jsou v [catalog.py](e77sim/catalog.py).
+2. **Datový model**: Euromap 77 s povinným základem (sledování stroje) a dvěma rozšířeními, Zakázky (Jobs) a Datové sady (ProductionDatasetManagement). Volitelné uzly se zapínají po srozumitelných skupinách, například *Šnek a válec*, *Řízení z MES* nebo *Podrobné cyklové parametry*. Skupiny jsou v [catalog.py](emsim/catalog.py).
 3. **Shrnutí** a spuštění. Nový stroj hned běží na svém portu.
 
-Tlačítko **Odebrat stroj** zastaví a odebere vybraný stroj, **Uložit jako YAML** stáhne jeho profil. Všechny změny se ukládají do `e77sim-data/stroje.yaml` a po dalším spuštění naběhnou znovu. Výchozí stroje jsou zabudované v programu: **Obnovit výchozí stroje** nebo smazání `stroje.yaml` vrátí původní stav. Když se simulátor spustí s `-m`, změny se neukládají.
+Tlačítko **Odebrat stroj** zastaví a odebere vybraný stroj, **Uložit jako YAML** stáhne jeho profil. Všechny změny se ukládají do `emsim-data/stroje.yaml` a po dalším spuštění naběhnou znovu. Výchozí stroje jsou zabudované v programu: **Obnovit výchozí stroje** nebo smazání `stroje.yaml` vrátí původní stav. Když se simulátor spustí s `-m`, změny se neukládají.
 
 ## Webové UI
 
@@ -69,7 +69,7 @@ Nahoře jsou karty strojů a přehled: endpoint, počet připojených klientů, 
 
 ## Profily
 
-Profil je YAML s identitou stroje, zapnutými facety, skupinami volitelných uzlů (`options`), počtem a nastavením vstřikovacích jednotek, forem, teplotních zón, pohonných jednotek a obsluhy, výchozí zakázkou, cyklovými parametry a výchozími generátory. Základem je [generic.yaml](e77sim/profiles/generic.yaml) s plným Euromap 77. Předvolby pilotních strojů (`battenfeld_1`, `arburg_31`, `arburg_37`, `zhafir_22`, `zhafir_28`, `engel_26`, `engel_27`) z něj dědí přes `extends: generic` a mění jen to, co se liší. Identita a typ odpovídají seznamu pilotních strojů, počty jednotek a zón jsou odvozené z typového označení a nejsou ověřené. Pilotní předvolby mají do potvrzení rozsahu od výrobců Basic + Jobs, Zhafiry jen povinné uzly.
+Profil je YAML s identitou stroje, zapnutými facety, skupinami volitelných uzlů (`options`), počtem a nastavením vstřikovacích jednotek, forem, teplotních zón, pohonných jednotek a obsluhy, výchozí zakázkou, cyklovými parametry a výchozími generátory. Základem je [generic.yaml](emsim/profiles/generic.yaml) s plným Euromap 77. Předvolby pilotních strojů (`battenfeld_1`, `arburg_31`, `arburg_37`, `zhafir_22`, `zhafir_28`, `engel_26`, `engel_27`) z něj dědí přes `extends: generic` a mění jen to, co se liší. Identita a typ odpovídají seznamu pilotních strojů, počty jednotek a zón jsou odvozené z typového označení a nejsou ověřené. Pilotní předvolby mají do potvrzení rozsahu od výrobců Basic + Jobs, Zhafiry jen povinné uzly.
 
 Starší profily s `optional: all|none` a `include`/`exclude` fungují dál. Generátory s `kind` z verze 1.0 se při načtení převedou na nominál, odchylku a časovou konstantu.
 
@@ -77,9 +77,9 @@ Starší profily s `optional: all|none` a `include`/`exclude` fungují dál. Gen
 
 ```
 pip install -r requirements.txt pytest pytest-asyncio
-python -m e77sim            # spuštění ze zdrojů
+python -m emsim            # spuštění ze zdrojů
 python -m pytest            # testy: asyncua klient proti běžícímu simulátoru
-pyinstaller packaging/e77sim.spec   # jeden spustitelný soubor do dist/
+pyinstaller packaging/emsim.spec   # jeden spustitelný soubor do dist/
 ```
 
 Windows `.exe` vzniká v GitHub Actions na `windows-latest`. Release vznikne pushem tagu `v*` nebo ručním spuštěním workflow *Test and build* s vyplněným `release_tag`. PyInstaller neumí křížový překlad, takže lokálně se staví vždy pro aktuální systém.

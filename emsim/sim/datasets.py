@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from ..opcua.typetree import TypeTree
     from .machine import Machine
 
-log = logging.getLogger("e77sim")
+log = logging.getLogger("emsim")
 
 ST_PRODUCTION, ST_PREPARATION, ST_FILE_SYSTEM = 1, 2, 4
 PDM = "ProductionDatasetManagement"
@@ -96,7 +96,7 @@ class Datasets:
             for p, v in self.m.values.items()
             if p.endswith("/NominalTemperature") or p.endswith("/StandbyTemperature")
         }
-        doc = {"format": "e77sim-dataset/1", "name": name, "machine": self.m.name, "setpoints": setpoints,
+        doc = {"format": "emsim-dataset/1", "name": name, "machine": self.m.name, "setpoints": setpoints,
                "cycle": self.m.cycle_cfg}
         return json.dumps(doc, ensure_ascii=False, indent=1).encode("utf-8")
 

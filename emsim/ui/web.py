@@ -19,7 +19,7 @@ from ..opcua.builder import Builder
 from ..resources import static_dir
 from ..sim.machine import EO_OPERATOR, Machine
 
-log = logging.getLogger("e77sim")
+log = logging.getLogger("emsim")
 
 
 def to_json(v: Any) -> Any:

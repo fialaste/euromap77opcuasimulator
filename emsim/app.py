@@ -18,7 +18,7 @@ from .resources import data_dir
 from .sim.machine import Machine
 from .ui.web import WebUI
 
-log = logging.getLogger("e77sim")
+log = logging.getLogger("emsim")
 
 HELP = """Příkazy konzole:
   s, status   stav strojů
@@ -29,10 +29,10 @@ HELP = """Příkazy konzole:
 
 def parse_args(argv=None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        prog="e77sim",
+        prog="emsim",
         description="Simulátor vstřikovacích lisů s rozhraním Euromap 77 (OPC 40077) přes OPC UA.",
         epilog=f"Vestavěné profily: {', '.join(builtin_profiles())}. Bez -m se spustí stroje uložené v UI "
-               f"({SAVE_FILE}), jinak {' a '.join(DEFAULT_MACHINES)}. Příklad: e77sim -m arburg_31:4840 -m engel_26:4841",
+               f"({SAVE_FILE}), jinak {' a '.join(DEFAULT_MACHINES)}. Příklad: emsim -m arburg_31:4840 -m engel_26:4841",
     )
     p.add_argument("-m", "--machine", action="append", metavar="PROFIL[:PORT]",
                    help=f"stroj: vestavěný profil nebo cesta k YAML, volitelně s portem (nejvýše {MAX_MACHINES}×); "
@@ -46,9 +46,9 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--no-anonymous", action="store_true", help="zakázat anonymní přihlášení")
     p.add_argument("--password", default="", help="heslo uživatele OPC40077 (prázdné = libovolné)")
     p.add_argument("--password-read-only", default="", help="heslo uživatele OPC40077_read_only (prázdné = libovolné)")
-    p.add_argument("--data-dir", help="složka pro certifikáty (výchozí e77sim-data vedle programu)")
+    p.add_argument("--data-dir", help="složka pro certifikáty (výchozí emsim-data vedle programu)")
     p.add_argument("-v", "--verbose", action="store_true", help="podrobný log včetně asyncua")
-    p.add_argument("--version", action="version", version=f"e77sim {__version__}")
+    p.add_argument("--version", action="version", version=f"emsim {__version__}")
     return p.parse_args(argv)
 
 
@@ -58,7 +58,7 @@ def setup_console(verbose: bool) -> None:
             import ctypes
 
             ctypes.windll.kernel32.SetConsoleOutputCP(65001)
-            ctypes.windll.kernel32.SetConsoleTitleW(f"Euromap 77 Simulator {__version__}")
+            ctypes.windll.kernel32.SetConsoleTitleW(f"Euromap Simulator {__version__}")
         except Exception:
             pass
     for stream in (sys.stdout, sys.stderr):
@@ -123,7 +123,7 @@ async def run(args) -> int:
         specs = fleet.saved_specs()
         if specs is None:  # an empty saved list means the user removed every machine
             specs = fleet.default_specs()
-    print(f"Euromap 77 Simulator {__version__} – spouštím {len(specs)} stroj(e)…")
+    print(f"Euromap Simulator {__version__} – spouštím {len(specs)} stroj(e)…")
     try:
         await fleet.start(specs)
     except FleetError as e:

@@ -25,7 +25,7 @@ from . import generators as gens
 from .datasets import Datasets
 from .page import page_png
 
-log = logging.getLogger("e77sim")
+log = logging.getLogger("emsim")
 
 # Enumerations (values from the NodeSets)
 MM_OTHER, MM_AUTOMATIC, MM_SEMI_AUTOMATIC, MM_MANUAL, MM_SETUP, MM_SLEEP = range(6)
@@ -137,7 +137,7 @@ class Machine:
             self.allow_anonymous, self.security,
         )
         server = self.server
-        self.ns = await server.register_namespace(f"urn:e77sim:{self.name}")
+        self.ns = await server.register_namespace(f"urn:emsim:{self.name}")
         tree = TypeTree(server)
         imm = await server.get_namespace_index(NS_IMM)
         root_decl = await tree.root(ua.NodeId(1007, imm), self.name)

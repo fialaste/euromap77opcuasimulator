@@ -1,5 +1,5 @@
 "use strict";
-// Euromap 77 Simulator UI. Plain JS, polls the local server once a second.
+// Euromap Simulator UI. Plain JS, polls the local server once a second.
 
 const S = {
   machines: [], cur: 0, tree: null, byPath: {}, state: null,
