@@ -3,5 +3,5 @@ __pycache__/
 *.egg-info/
 build/
 dist/
-e77sim-data/
+emsim-data/
 .pytest_cache/

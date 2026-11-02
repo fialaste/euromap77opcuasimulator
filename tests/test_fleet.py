@@ -3,9 +3,9 @@ import asyncio
 import pytest
 import yaml
 
-from e77sim import catalog
-from e77sim.config import CATALOG, DEFAULT_MACHINES, load_profile
-from e77sim.fleet import SAVE_FILE, Fleet, FleetError
+from emsim import catalog
+from emsim.config import CATALOG, DEFAULT_MACHINES, load_profile
+from emsim.fleet import SAVE_FILE, Fleet, FleetError
 
 
 def fleet(tmp_path, **kw):
@@ -111,3 +111,15 @@ async def test_empty_saved_fleet_stays_empty_and_reset_without_saving_keeps_the_
         assert (tmp_path / SAVE_FILE).exists()
     finally:
         await g.stop()
+
+
+def test_old_data_folder_is_renamed(tmp_path, monkeypatch):
+    from emsim import resources
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "e77sim-data").mkdir()
+    (tmp_path / "e77sim-data" / "stroje.yaml").write_text("machines: []\n", encoding="utf-8")
+    path = resources.data_dir()
+    assert path == tmp_path / "emsim-data"
+    assert (path / "stroje.yaml").is_file()
+    assert not (tmp_path / "e77sim-data").exists()

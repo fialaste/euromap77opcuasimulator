@@ -35,15 +35,15 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt pyinstaller
-      - run: pyinstaller --noconfirm --clean packaging/e77sim.spec
+      - run: pyinstaller --noconfirm --clean packaging/emsim.spec
       - name: Smoke test of the executable
         shell: bash
         run: |
-          ./dist/e77sim --version
+          ./dist/emsim --version
       - uses: actions/upload-artifact@v4
         with:
-          name: e77sim-${{ runner.os }}
-          path: dist/e77sim*
+          name: emsim-${{ runner.os }}
+          path: dist/emsim*
           if-no-files-found: error
 
   release:
@@ -61,14 +61,14 @@ jobs:
       - name: Name the release files
         run: |
           mkdir release
-          cp artifacts/e77sim-Windows/e77sim.exe "release/e77sim-$TAG-windows-x64.exe"
-          cp artifacts/e77sim-Linux/e77sim "release/e77sim-$TAG-linux-x64"
-          chmod +x "release/e77sim-$TAG-linux-x64"
+          cp artifacts/emsim-Windows/emsim.exe "release/emsim-$TAG-windows-x64.exe"
+          cp artifacts/emsim-Linux/emsim "release/emsim-$TAG-linux-x64"
+          chmod +x "release/emsim-$TAG-linux-x64"
           (cd release && sha256sum * > SHA256SUMS.txt)
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG }}
           target_commitish: ${{ github.sha }}
-          name: e77sim ${{ env.TAG }}
+          name: emsim ${{ env.TAG }}
           generate_release_notes: true
           files: release/*

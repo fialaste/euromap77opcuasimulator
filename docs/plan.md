@@ -71,11 +71,11 @@ Technologie:
 - **pydantic** a **PyYAML** pro profily, **pytest** a **pytest-asyncio** pro testy.
 
 ```
-e77sim/
+emsim/
   nodesets/            # DI 1.04, GeneralTypes 1.02 (opravený), IMM2MES 1.01
   profiles/            # generic.yaml + předvolby pilotních strojů (extends: generic)
-  e77sim/
-    __main__.py        # CLI: e77sim run profiles/*.yaml --ui-port 8080
+  emsim/
+    __main__.py        # CLI: emsim run profiles/*.yaml --ui-port 8080
     config/  model/  opcua/  sim/  ui/
   tests/
 ```

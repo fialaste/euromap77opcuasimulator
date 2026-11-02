@@ -1,4 +1,4 @@
-from e77sim.app import main
+from emsim.app import main
 
 if __name__ == "__main__":
     main()

@@ -53,7 +53,7 @@ _ADMIN_REQUESTS = {
 }
 
 
-class E77Users(UserManager):
+class EmUsers(UserManager):
     """Users from OPC 40077 chapter 6. Passwords are chosen by the manufacturer and may be empty;
     an empty configured password accepts any password."""
 
@@ -74,7 +74,7 @@ class E77Users(UserManager):
         return User(role=UserRole.User, name=username)
 
 
-class E77Ruleset(PermissionRuleset):
+class EmRuleset(PermissionRuleset):
     """OPC40077 may write and call methods, OPC40077_read_only only reads, browses and subscribes."""
 
     def check_validity(self, user, action_type_id, body):
@@ -109,7 +109,7 @@ async def ensure_certificate(pki: Path, app_uri: str, name: str) -> tuple[Path, 
     cert = generate_self_signed_app_certificate(
         key,
         name[:CN_MAX],
-        {"countryName": "CZ", "organizationName": "Euromap 77 Simulator"},
+        {"countryName": "CZ", "organizationName": "Euromap Simulator"},
         [x509.UniformResourceIdentifier(app_uri), x509.DNSName(host)],
         extended=[ExtendedKeyUsageOID.SERVER_AUTH, ExtendedKeyUsageOID.CLIENT_AUTH],
         days=365,
@@ -128,16 +128,16 @@ async def create_server(
     allow_anonymous: bool = True,
     security: bool = True,
 ) -> Server:
-    server = Server(user_manager=E77Users(passwords or {}, allow_anonymous))
+    server = Server(user_manager=EmUsers(passwords or {}, allow_anonymous))
     await server.init()
     server.set_endpoint(f"opc.tcp://{host}:{port}/")
-    server.set_server_name(f"Euromap 77 Simulator - {name}")
-    app_uri = f"urn:e77sim:{socket.gethostname()}:{name}"
+    server.set_server_name(f"Euromap Simulator - {name}")
+    app_uri = f"urn:emsim:{socket.gethostname()}:{name}"
     await server.set_application_uri(app_uri)
     await server.set_build_info(
-        product_uri="urn:e77sim",
-        manufacturer_name="Euromap 77 Simulator",
-        product_name="Euromap 77 Simulator",
+        product_uri="urn:emsim",
+        manufacturer_name="Euromap Simulator",
+        product_name="Euromap Simulator",
         software_version=__version__,
         build_number=__version__,
         build_date=_build_date(),
@@ -153,7 +153,7 @@ async def create_server(
             ua.SecurityPolicyType.Basic256Sha256_Sign,
             ua.SecurityPolicyType.Basic256Sha256_SignAndEncrypt,
         ]
-    server.set_security_policy(policies, permission_ruleset=E77Ruleset())
+    server.set_security_policy(policies, permission_ruleset=EmRuleset())
     tokens = [ua.UserNameIdentityToken, ua.X509IdentityToken]
     if allow_anonymous:
         tokens.insert(0, ua.AnonymousIdentityToken)

@@ -57,7 +57,7 @@ async def test_machine_is_under_device_set_with_type(arburg):
 
 async def test_mandatory_nodes_of_basic_profile_exist(zhafir):
     """Every mandatory instance declaration of IMM_MES_InterfaceType is present (minimal profile)."""
-    from e77sim.opcua.typetree import TypeTree
+    from emsim.opcua.typetree import TypeTree
 
     tree = TypeTree(zhafir.server)
     imm = await zhafir.server.get_namespace_index(IMM)
@@ -265,10 +265,10 @@ async def test_secure_endpoints(tmp_path, policy):
     m = await start_machine("zhafir_22", tmp_path / "srv")
     try:
         key, cert = tmp_path / "client.pem", tmp_path / "client.der"
-        await setup_self_signed_certificate(key, cert, "urn:e77sim:test-client", "localhost",
+        await setup_self_signed_certificate(key, cert, "urn:emsim:test-client", "localhost",
                                             [ExtendedKeyUsageOID.CLIENT_AUTH], {"commonName": "test"})
         c = Client(m.endpoint)
-        c.application_uri = "urn:e77sim:test-client"
+        c.application_uri = "urn:emsim:test-client"
         await c.set_security_string(f"{policy},Sign,{cert},{key}")
         c.set_user("OPC40077")
         c.set_password("")
